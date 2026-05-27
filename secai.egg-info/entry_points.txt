@@ -1,0 +1,2 @@
+[console_scripts]
+secai-cli = secai.cli.main:main

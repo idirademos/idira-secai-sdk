@@ -1,0 +1,92 @@
+"""SecAI — CyberArk Secure AI Python SDK."""
+
+from .client import SecAIClient
+from .exceptions import (
+    AuthenticationError,
+    AuthorizationError,
+    ConflictError,
+    NotFoundError,
+    RateLimitError,
+    SecAIError,
+    ServerError,
+    UnexpectedError,
+    ValidationError,
+)
+from .models import (
+    Agent,
+    AgentCredentials,
+    AgentState,
+    AgentStateRequest,
+    AgentStateResponse,
+    AgentStatus,
+    AgentType,
+    AgentWithCredentials,
+    ApiError,
+    EditAgentRequest,
+    EditMcpServerRequest,
+    ListAgentsResponse,
+    McpAuthMethod,
+    McpAuthType,
+    McpCategory,
+    McpServerListResponse,
+    McpServerResponse,
+    McpServerStateRequest,
+    McpSource,
+    McpSourceType,
+    McpState,
+    McpUpstream,
+    Owner,
+    OwnerType,
+    PredefinedMcpListResponse,
+    PredefinedMcpTarget,
+    RegisterAgentRequest,
+    RegisterMcpServerRequest,
+)
+
+__all__ = [
+    # Client
+    "SecAIClient",
+    # Exceptions
+    "SecAIError",
+    "AuthenticationError",
+    "AuthorizationError",
+    "NotFoundError",
+    "ConflictError",
+    "ValidationError",
+    "RateLimitError",
+    "ServerError",
+    "UnexpectedError",
+    # Models — agents
+    "AgentType",
+    "AgentState",
+    "OwnerType",
+    "Owner",
+    "AgentStatus",
+    "RegisterAgentRequest",
+    "EditAgentRequest",
+    "AgentCredentials",
+    "Agent",
+    "AgentWithCredentials",
+    "AgentStateRequest",
+    "AgentStateResponse",
+    "ListAgentsResponse",
+    # Models — targets
+    "McpSourceType",
+    "McpAuthType",
+    "McpCategory",
+    "McpState",
+    "McpSource",
+    "McpUpstream",
+    "McpAuthMethod",
+    "McpServerResponse",
+    "RegisterMcpServerRequest",
+    "EditMcpServerRequest",
+    "McpServerStateRequest",
+    "McpServerListResponse",
+    "PredefinedMcpTarget",
+    "PredefinedMcpListResponse",
+    # Misc
+    "ApiError",
+]
+
+__version__ = "0.1.0"
