@@ -49,14 +49,15 @@ targets from Python code or a command-line interface.
 The quickest way to get `secai-cli` on your `$PATH` in its own isolated environment:
 
 ```bash
-uv tool install secai
+uv tool install .
 secai-cli --help
 ```
+Be sure to configure the environment variables in env-vars.sh and source that file to set the auth token before running commands. 
 
 ### Add the library to a project
 
 ```bash
-uv add secai
+uv add <path-to>/secai
 ```
 
 With optional extras:
@@ -64,6 +65,8 @@ With optional extras:
 ```bash
 uv add "secai[dev,test]"
 ```
+The dev extras include the ruff linter, mypy type checker, and pre-commit git hook manager packages.
+The test extras include pytest and pytest-httpx test driver packages.
 
 ### Install from source (this repository)
 

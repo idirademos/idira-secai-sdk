@@ -6,6 +6,7 @@ secai/client.py
 secai/exceptions.py
 secai/models.py
 secai/py.typed
+secai/secai-cli.py
 secai/targets.py
 secai.egg-info/PKG-INFO
 secai.egg-info/SOURCES.txt

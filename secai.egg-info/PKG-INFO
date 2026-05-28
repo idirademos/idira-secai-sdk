@@ -1,7 +1,7 @@
 Metadata-Version: 2.4
 Name: secai
 Version: 0.1.0
-Summary: Idira Secure AI Python SDK — AI agent inventory and MCP target governance
+Summary: Idira Secure AI Python SDK — to automate AI agent & MCP target inventory management
 License: Apache-2.0
 Keywords: idira,ai,agents,mcp,security
 Classifier: Development Status :: 4 - Beta
@@ -42,7 +42,7 @@ targets from Python code or a command-line interface.
 | `secai` library | Typed Python client for all 14 API endpoints |
 | `secai-cli` CLI | A command per endpoint; three output modes; scriptable |
 | Test suite | Live functional tests that drive the CLI against a real tenant |
-| `examples/quickstart.py` | End-to-end runnable walkthrough |
+| `sdk-quickstart/quickstart.py` | End-to-end runnable walkthrough |
 
 ---
 
