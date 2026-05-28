@@ -44,6 +44,19 @@ targets from Python code or a command-line interface.
 
 ## Installation
 
+### Install from source (this repository)
+
+```bash
+git clone <repo-url>
+cd secai-sdk
+
+# Sync all dependencies (including dev and test extras)
+uv sync --extra dev --extra test
+
+# Run the CLI through uv
+uv run secai-cli --help
+```
+
 ### Install the CLI as a standalone tool
 
 The quickest way to get `secai-cli` on your `$PATH` in its own isolated environment:
@@ -68,18 +81,6 @@ uv add "secai[dev,test]"
 The dev extras include the ruff linter, mypy type checker, and pre-commit git hook manager packages.
 The test extras include pytest and pytest-httpx test driver packages.
 
-### Install from source (this repository)
-
-```bash
-git clone <repo-url>
-cd secai-sdk
-
-# Sync all dependencies (including dev and test extras)
-uv sync --extra dev --extra test
-
-# Run the CLI through uv
-uv run secai-cli --help
-```
 
 > **Note:** When working from a source checkout, prefix every CLI invocation with `uv run`
 > (e.g. `uv run secai-cli agents list`) so it uses the project's managed virtual environment.
