@@ -4,12 +4,12 @@ The **SecAI SDK** is the official Python client for the [Idira Secure AI API](se
 It lets you register, govern, and control AI agents and their MCP (Model Context Protocol) server
 targets from Python code or a command-line interface.
 
-| Component | What it gives you |
-|---|---|
-| `secai` library | Typed Python client for all 14 API endpoints |
-| `secai-cli` CLI | A command per endpoint; three output modes; scriptable |
-| Test suite | Live functional tests that drive the CLI against a real tenant |
-| `sdk-quickstart/quickstart.py` | End-to-end runnable walkthrough |
+| Component                      | What it gives you                                              |
+| ------------------------------ | -------------------------------------------------------------- |
+| `secai` library                | Typed Python client for all 14 API endpoints                   |
+| `secai-cli` CLI                | A command per endpoint; three output modes; scriptable         |
+| Test suite                     | Live functional tests that drive the CLI against a real tenant |
+| `sdk-quickstart/quickstart.py` | End-to-end runnable walkthrough                                |
 
 ---
 
@@ -65,7 +65,8 @@ The quickest way to get `secai-cli` on your `$PATH` in its own isolated environm
 uv tool install .
 secai-cli --help
 ```
-Be sure to configure the environment variables in env-vars.sh and source that file to set the auth token before running commands. 
+
+Be sure to configure the environment variables in env-vars.sh and source that file to set the auth token before running commands.
 
 ### Add the library to a project
 
@@ -78,9 +79,9 @@ With optional extras:
 ```bash
 uv add "secai[dev,test]"
 ```
+
 The dev extras include the ruff linter, mypy type checker, and pre-commit git hook manager packages.
 The test extras include pytest and pytest-httpx test driver packages.
-
 
 > **Note:** When working from a source checkout, prefix every CLI invocation with `uv run`
 > (e.g. `uv run secai-cli agents list`) so it uses the project's managed virtual environment.
@@ -92,12 +93,12 @@ The test extras include pytest and pytest-httpx test driver packages.
 
 The SDK reads configuration from environment variables or a `.env` file placed in the working directory.
 
-| Variable | CLI option | Description |
-|---|---|---|
+| Variable           | CLI option            | Description                                                           |
+| ------------------ | --------------------- | --------------------------------------------------------------------- |
 | `SECAI_TENANT_URL` | `--tenant-url` / `-u` | Base URL of your Idira tenant, e.g. `https://mytenant.cyberark.cloud` |
-| `SECAI_TOKEN` | `--token` / `-t` | Bearer JWT for authentication |
-| `SECAI_OUTPUT` | `--output` / `-o` | Default output format: `table` (default), `json`, `quiet` |
-| `SECAI_TIMEOUT` | `--timeout` | HTTP timeout in seconds (default: `30`) |
+| `SECAI_TOKEN`      | `--token` / `-t`      | Bearer JWT for authentication                                         |
+| `SECAI_OUTPUT`     | `--output` / `-o`     | Default output format: `table` (default), `json`, `quiet`             |
+| `SECAI_TIMEOUT`    | `--timeout`           | HTTP timeout in seconds (default: `30`)                               |
 
 Example `.env` file:
 
@@ -134,14 +135,14 @@ with SecAIClient() as client:
     agents = client.agents.list()
 ```
 
-**Constructor parameters**
+#### Constructor parameters
 
-| Parameter | Type | Default | Description |
-|---|---|---|---|
-| `tenant_url` | `str \| None` | `$SECAI_TENANT_URL` | Tenant base URL |
-| `token` | `str \| None` | `$SECAI_TOKEN` | Bearer JWT |
-| `timeout` | `float` | `30.0` | Per-request timeout in seconds |
-| `verify_ssl` | `bool` | `True` | Disable only for local testing — never in production |
+| Parameter    | Type          | Default             | Description                                          |
+| ------------ | ------------- | ------------------- | ---------------------------------------------------- |
+| `tenant_url` | `str \| None` | `$SECAI_TENANT_URL` | Tenant base URL                                      |
+| `token`      | `str \| None` | `$SECAI_TOKEN`      | Bearer JWT                                           |
+| `timeout`    | `float`       | `30.0`              | Per-request timeout in seconds                       |
+| `verify_ssl` | `bool`        | `True`              | Disable only for local testing — never in production |
 
 ---
 
@@ -359,41 +360,41 @@ and `by_alias=True` serialization to the API's camelCase wire format.
 
 #### Agent models
 
-| Model | Purpose |
-|---|---|
-| `RegisterAgentRequest` | Body for `POST /api/agents` |
-| `EditAgentRequest` | Body for `PATCH /api/agents/{id}` |
-| `Agent` | Agent record (no credentials) |
-| `AgentWithCredentials` | Agent record + `credentials` block |
-| `AgentCredentials` | `client_id`, `client_secret`, `gateway_url` |
-| `AgentStatus` | `state` (AgentState enum) + optional `message` |
-| `AgentStateResponse` | Response from state transition |
-| `ListAgentsResponse` | Paginated list of `Agent` |
+| Model                  | Purpose                                        |
+| ---------------------- | ---------------------------------------------- |
+| `RegisterAgentRequest` | Body for `POST /api/agents`                    |
+| `EditAgentRequest`     | Body for `PATCH /api/agents/{id}`              |
+| `Agent`                | Agent record (no credentials)                  |
+| `AgentWithCredentials` | Agent record + `credentials` block             |
+| `AgentCredentials`     | `client_id`, `client_secret`, `gateway_url`    |
+| `AgentStatus`          | `state` (AgentState enum) + optional `message` |
+| `AgentStateResponse`   | Response from state transition                 |
+| `ListAgentsResponse`   | Paginated list of `Agent`                      |
 
 #### Target models
 
-| Model | Purpose |
-|---|---|
-| `RegisterMcpServerRequest` | Body for `POST /api/targets/mcp-servers` |
-| `EditMcpServerRequest` | Body for `PUT /api/targets/mcp-servers/{id}` |
-| `McpServerResponse` | Registered MCP server record |
-| `McpServerListResponse` | Paginated list + `next_cursor` |
-| `PredefinedMcpTarget` | Predefined template record |
-| `PredefinedMcpListResponse` | List of predefined templates |
-| `McpSource` | `type` (CUSTOM/PREDEFINED) + optional `predefinedTargetId/Version` |
-| `McpUpstream` | `url` of the upstream MCP endpoint |
-| `McpAuthMethod` | `type` (OAUTH2.1/NONE), optional `authorizationServer`, `JWKS` |
+| Model                       | Purpose                                                            |
+| --------------------------- | ------------------------------------------------------------------ |
+| `RegisterMcpServerRequest`  | Body for `POST /api/targets/mcp-servers`                           |
+| `EditMcpServerRequest`      | Body for `PUT /api/targets/mcp-servers/{id}`                       |
+| `McpServerResponse`         | Registered MCP server record                                       |
+| `McpServerListResponse`     | Paginated list + `next_cursor`                                     |
+| `PredefinedMcpTarget`       | Predefined template record                                         |
+| `PredefinedMcpListResponse` | List of predefined templates                                       |
+| `McpSource`                 | `type` (CUSTOM/PREDEFINED) + optional `predefinedTargetId/Version` |
+| `McpUpstream`               | `url` of the upstream MCP endpoint                                 |
+| `McpAuthMethod`             | `type` (OAUTH2.1/NONE), optional `authorizationServer`, `JWKS`     |
 
 #### Enumerations
 
-| Enum | Values |
-|---|---|
-| `AgentState` | `PENDING_CONNECTION`, `PENDING_CONFIGURATION`, `ACTIVE`, `SUSPENDED`, `CONNECTION_ERROR`, `ERROR` |
-| `AgentType` | `COPILOT`, `CLAUDE`, `CUSTOM` |
-| `McpSourceType` | `CUSTOM`, `PREDEFINED` |
-| `McpAuthType` | `OAUTH2_1`, `NONE` |
-| `McpState` | `ENABLED`, `DISABLED` |
-| `McpCategory` | `COMMUNICATION_AND_TEAM_CHAT`, `DEVELOPER_TOOLS_AND_SOURCE_CONTROL`, `ITSM_AND_INCIDENT_RESPONSE`, `KNOWLEDGE_BASES_AND_DOCS`, `WEB_AND_BROWSER_AUTOMATION` |
+| Enum            | Values                                                                                                                                                      |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AgentState`    | `PENDING_CONNECTION`, `PENDING_CONFIGURATION`, `ACTIVE`, `SUSPENDED`, `CONNECTION_ERROR`, `ERROR`                                                           |
+| `AgentType`     | `COPILOT`, `CLAUDE`, `CUSTOM`                                                                                                                               |
+| `McpSourceType` | `CUSTOM`, `PREDEFINED`                                                                                                                                      |
+| `McpAuthType`   | `OAUTH2_1`, `NONE`                                                                                                                                          |
+| `McpState`      | `ENABLED`, `DISABLED`                                                                                                                                       |
+| `McpCategory`   | `COMMUNICATION_AND_TEAM_CHAT`, `DEVELOPER_TOOLS_AND_SOURCE_CONTROL`, `ITSM_AND_INCIDENT_RESPONSE`, `KNOWLEDGE_BASES_AND_DOCS`, `WEB_AND_BROWSER_AUTOMATION` |
 
 ---
 
@@ -429,22 +430,22 @@ except SecAIError as e:
     print(f"Unexpected error {e.status_code}: {e}")
 ```
 
-| Exception | HTTP Status |
-|---|---|
-| `AuthenticationError` | 401 |
-| `AuthorizationError` | 403 |
-| `NotFoundError` | 404 |
-| `ConflictError` | 409 |
-| `ValidationError` | 422 |
-| `RateLimitError` | 429 |
-| `ServerError` | 5xx |
-| `UnexpectedError` | Any other |
+| Exception             | HTTP Status |
+| --------------------- | ----------- |
+| `AuthenticationError` | 401         |
+| `AuthorizationError`  | 403         |
+| `NotFoundError`       | 404         |
+| `ConflictError`       | 409         |
+| `ValidationError`     | 422         |
+| `RateLimitError`      | 429         |
+| `ServerError`         | 5xx         |
+| `UnexpectedError`     | Any other   |
 
 ---
 
 ## CLI Reference
 
-```
+```bash
 secai-cli [OPTIONS] COMMAND [ARGS]...
 
 Options:
@@ -471,7 +472,7 @@ export SECAI_OUTPUT=json   # optional: table (default) | json | quiet
 
 #### `agents list`
 
-```
+```bash
 secai-cli agents list [--output TABLE|JSON|QUIET]
 ```
 
@@ -487,7 +488,7 @@ secai-cli agents list --output json | jq '.[].id'
 
 #### `agents register`
 
-```
+```bash
 secai-cli agents register \
   --name      <name>         Required. Alphanumeric, spaces, hyphens.
   --type      <type>         Required. COPILOT | CLAUDE | CUSTOM.
@@ -511,6 +512,7 @@ secai-cli agents register \
 ```
 
 > The `clientSecret` is printed once. Pipe to a secrets manager immediately in automated flows:
+>
 > ```bash
 > secai-cli agents register --name MyAgent --type COPILOT --output json \
 >   | jq -r '.credentials.clientSecret' \
@@ -521,7 +523,7 @@ secai-cli agents register \
 
 #### `agents get <agent-id>`
 
-```
+```bash
 secai-cli agents get <agent-id> [--output TABLE|JSON|QUIET]
 ```
 
@@ -534,7 +536,7 @@ secai-cli agents get a8f9c2d1-3e4b-42fa-bb71-2a913d45ef12 --output json
 
 #### `agents edit <agent-id>`
 
-```
+```bash
 secai-cli agents edit <agent-id> \
   [--name <name>] [--description <text>] [--owner <team>]
   [--tag KEY=VALUE ...]   # Replaces all existing tags
@@ -573,7 +575,7 @@ secai-cli agents delete a8f9c2d1 --confirm
 
 #### `targets list`
 
-```
+```bash
 secai-cli targets list [--cursor <cursor>] [--output TABLE|JSON|QUIET]
 ```
 
@@ -586,7 +588,7 @@ secai-cli targets list --output json | jq '.mcpServers[].name'
 
 #### `targets register`
 
-```
+```bash
 secai-cli targets register \
   --source CUSTOM|PREDEFINED        Required.
   --name <name>                     Required for CUSTOM; optional for PREDEFINED.
@@ -628,13 +630,13 @@ secai-cli targets register \
 
 **Valid category values:**
 
-| Value | Description |
-|---|---|
-| `COMMUNICATION_AND_TEAM_CHAT` | Slack, Teams, etc. |
-| `DEVELOPER_TOOLS_AND_SOURCE_CONTROL` | GitHub, GitLab, etc. |
-| `ITSM_AND_INCIDENT_RESPONSE` | Jira, ServiceNow, etc. |
-| `KNOWLEDGE_BASES_AND_DOCS` | Confluence, Notion, etc. |
-| `WEB_AND_BROWSER_AUTOMATION` | Web scraping, browser tools |
+| Value                                | Description                 |
+| ------------------------------------ | --------------------------- |
+| `COMMUNICATION_AND_TEAM_CHAT`        | Slack, Teams, etc.          |
+| `DEVELOPER_TOOLS_AND_SOURCE_CONTROL` | GitHub, GitLab, etc.        |
+| `ITSM_AND_INCIDENT_RESPONSE`         | Jira, ServiceNow, etc.      |
+| `KNOWLEDGE_BASES_AND_DOCS`           | Confluence, Notion, etc.    |
+| `WEB_AND_BROWSER_AUTOMATION`         | Web scraping, browser tools |
 
 ---
 
@@ -649,7 +651,7 @@ secai-cli targets get tgt-custom-slack-001 --output json
 
 #### `targets edit <id>`
 
-```
+```bash
 secai-cli targets edit <id> \
   [--description <text>]
   [--category <category>]    # Custom targets only
@@ -708,11 +710,11 @@ secai-cli targets get-predefined 3f4e5d6c-7b8a-4c9d-a1e2-f3b4c5d6e7f8
 
 ### Output Formats
 
-| Format | How to select | Best for |
-|---|---|---|
-| `table` | Default / `--output table` | Interactive terminal use; color-coded states |
-| `json` | `--output json` / `SECAI_OUTPUT=json` | Piping to `jq`, integration scripts, CI |
-| `quiet` | `--output quiet` / `SECAI_OUTPUT=quiet` | Capturing IDs in shell variables |
+| Format  | How to select                           | Best for                                     |
+| ------- | --------------------------------------- | -------------------------------------------- |
+| `table` | Default / `--output table`              | Interactive terminal use; color-coded states |
+| `json`  | `--output json` / `SECAI_OUTPUT=json`   | Piping to `jq`, integration scripts, CI      |
+| `quiet` | `--output quiet` / `SECAI_OUTPUT=quiet` | Capturing IDs in shell variables             |
 
 **Capture an ID in a shell script:**
 
@@ -723,11 +725,11 @@ echo "Created agent: $AGENT_ID"
 
 **Exit codes:**
 
-| Code | Meaning |
-|---|---|
-| `0` | Success |
-| `1` | Client error (4xx) |
-| `2` | Server error (5xx) |
+| Code | Meaning            |
+| ---- | ------------------ |
+| `0`  | Success            |
+| `1`  | Client error (4xx) |
+| `2`  | Server error (5xx) |
 
 ---
 
@@ -783,7 +785,7 @@ python examples/quickstart.py
 
 Expected output (abbreviated):
 
-```
+```plaintext
 ── Existing agents ──────────────────────────────────────────────
   a8f9c2d1  IT Operations Agent          ACTIVE
   b9e8d7c6  Sales Bot                    SUSPENDED
@@ -818,7 +820,7 @@ Done.
 
 ## Project Layout
 
-```
+```plaintext
 sai-api2/
 ├── pyproject.toml              # Package metadata and dependencies
 ├── secai-api.yaml              # OpenAPI 3.0 source spec
@@ -852,22 +854,22 @@ sai-api2/
 
 ## API Endpoint Coverage
 
-| Method | Endpoint | SDK method | CLI command |
-|---|---|---|---|
-| GET | `/api/agents` | `client.agents.list()` | `secai-cli agents list` |
-| POST | `/api/agents` | `client.agents.register(req)` | `secai-cli agents register` |
-| GET | `/api/agents/{id}` | `client.agents.get(id)` | `secai-cli agents get <id>` |
-| PATCH | `/api/agents/{id}` | `client.agents.edit(id, req)` | `secai-cli agents edit <id>` |
-| DELETE | `/api/agents/{id}` | `client.agents.delete(id)` | `secai-cli agents delete <id> --confirm` |
-| POST | `/api/agents/{id}/state` | `client.agents.set_state(id, state)` | `secai-cli agents set-state <id> <state>` |
-| GET | `/api/targets/mcp-servers` | `client.targets.list_mcp_servers()` | `secai-cli targets list` |
-| POST | `/api/targets/mcp-servers` | `client.targets.register_mcp_server(req)` | `secai-cli targets register` |
-| GET | `/api/targets/mcp-servers/{id}` | `client.targets.get_mcp_server(id)` | `secai-cli targets get <id>` |
-| PUT | `/api/targets/mcp-servers/{id}` | `client.targets.edit_mcp_server(id, req)` | `secai-cli targets edit <id>` |
-| DELETE | `/api/targets/mcp-servers/{id}` | `client.targets.delete_mcp_server(id)` | `secai-cli targets delete <id> --confirm` |
-| POST | `/api/targets/mcp-servers/{id}/state` | `client.targets.set_mcp_server_state(id, state)` | `secai-cli targets set-state <id> <state>` |
-| GET | `/api/targets/predefined/mcp-servers` | `client.targets.list_predefined_mcp_servers()` | `secai-cli targets list-predefined` |
-| GET | `/api/targets/predefined/mcp-servers/{id}` | `client.targets.get_predefined_mcp_server(id)` | `secai-cli targets get-predefined <id>` |
+| Method | Endpoint                                   | SDK method                                       | CLI command                                |
+| ------ | ------------------------------------------ | ------------------------------------------------ | ------------------------------------------ |
+| GET    | `/api/agents`                              | `client.agents.list()`                           | `secai-cli agents list`                    |
+| POST   | `/api/agents`                              | `client.agents.register(req)`                    | `secai-cli agents register`                |
+| GET    | `/api/agents/{id}`                         | `client.agents.get(id)`                          | `secai-cli agents get <id>`                |
+| PATCH  | `/api/agents/{id}`                         | `client.agents.edit(id, req)`                    | `secai-cli agents edit <id>`               |
+| DELETE | `/api/agents/{id}`                         | `client.agents.delete(id)`                       | `secai-cli agents delete <id> --confirm`   |
+| POST   | `/api/agents/{id}/state`                   | `client.agents.set_state(id, state)`             | `secai-cli agents set-state <id> <state>`  |
+| GET    | `/api/targets/mcp-servers`                 | `client.targets.list_mcp_servers()`              | `secai-cli targets list`                   |
+| POST   | `/api/targets/mcp-servers`                 | `client.targets.register_mcp_server(req)`        | `secai-cli targets register`               |
+| GET    | `/api/targets/mcp-servers/{id}`            | `client.targets.get_mcp_server(id)`              | `secai-cli targets get <id>`               |
+| PUT    | `/api/targets/mcp-servers/{id}`            | `client.targets.edit_mcp_server(id, req)`        | `secai-cli targets edit <id>`              |
+| DELETE | `/api/targets/mcp-servers/{id}`            | `client.targets.delete_mcp_server(id)`           | `secai-cli targets delete <id> --confirm`  |
+| POST   | `/api/targets/mcp-servers/{id}/state`      | `client.targets.set_mcp_server_state(id, state)` | `secai-cli targets set-state <id> <state>` |
+| GET    | `/api/targets/predefined/mcp-servers`      | `client.targets.list_predefined_mcp_servers()`   | `secai-cli targets list-predefined`        |
+| GET    | `/api/targets/predefined/mcp-servers/{id}` | `client.targets.get_predefined_mcp_server(id)`   | `secai-cli targets get-predefined <id>`    |
 
 ---
 
