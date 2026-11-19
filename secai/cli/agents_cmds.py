@@ -19,7 +19,9 @@ from ..models import (
     Owner,
     OwnerType,
     RegisterAgentRequest,
+    SearchAgentsRequest,
 )
+from .auth import resolve_credentials
 
 agents_app = typer.Typer(no_args_is_help=True)
 console = Console()
@@ -27,9 +29,10 @@ err_console = Console(stderr=True)
 
 
 def _client() -> SecAIClient:
+    tenant_url, token = resolve_credentials()
     return SecAIClient(
-        tenant_url=os.environ.get("SECAI_TENANT_URL"),
-        token=os.environ.get("SECAI_TOKEN"),
+        tenant_url=tenant_url,
+        token=token,
         timeout=float(os.environ.get("SECAI_TIMEOUT", "30")),
     )
 
@@ -59,7 +62,7 @@ def _die(exc: SecAIError) -> None:
     sys.exit(1 if 400 <= code < 500 else 2)
 
 
-_POSITIONAL_ARGS = {"agent_id", "server_id", "predefined_id", "state"}
+_POSITIONAL_ARGS = {"agent_id", "server_id", "predefined_id", "state", "descriptor_id", "policy_id"}
 
 
 def _help_if_missing(ctx: typer.Context, **named_values: object) -> None:
@@ -86,16 +89,24 @@ def _help_if_missing(ctx: typer.Context, **named_values: object) -> None:
 
 @agents_app.command("list")
 def agents_list(
+    page_size: Optional[int] = typer.Option(None, "--page-size", help="Max agents per page (1-1000)."),
+    continuation_token: Optional[str] = typer.Option(
+        None, "--continuation-token", help="Continuation token from a previous response's page_info."
+    ),
     output: Optional[str] = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
 ) -> None:
-    """List all agents in the tenant."""
+    """List agents in the tenant (one page; use --continuation-token for more)."""
     fmt = (output or _fmt()).lower()
     try:
         with _client() as client:
-            agents = client.agents.list()
+            result = client.agents.list(
+                page_size=page_size, continuation_token=continuation_token
+            )
     except SecAIError as exc:
         _die(exc)
         return
+
+    agents = result.agents
 
     if fmt == "quiet":
         for a in agents:
@@ -104,8 +115,9 @@ def agents_list(
 
     if fmt == "json":
         import json
+
         from rich import print_json
-        print_json(json.dumps([a.model_dump(by_alias=True) for a in agents], default=str))
+        print_json(json.dumps(result.model_dump(by_alias=True), default=str))
         return
 
     table = Table(title=f"Agents ({len(agents)})", show_header=True, header_style="bold blue")
@@ -120,9 +132,7 @@ def agents_list(
         "ACTIVE": "green",
         "SUSPENDED": "yellow",
         "PENDING_CONNECTION": "cyan",
-        "PENDING_CONFIGURATION": "cyan",
         "CONNECTION_ERROR": "red",
-        "ERROR": "red",
     }
 
     for a in agents:
@@ -144,6 +154,129 @@ def agents_list(
             updated,
         )
     console.print(table)
+    if result.page_info and result.page_info.continuation_token:
+        console.print(
+            f"[dim]More results available — pass "
+            f"--continuation-token {result.page_info.continuation_token} for the next page.[/dim]"
+        )
+
+
+# ---------------------------------------------------------------------------
+# agents search
+# ---------------------------------------------------------------------------
+
+
+@agents_app.command("search")
+def agents_search(
+    filter: str = typer.Argument(..., help='Filter expression, e.g. "type in [AWS_BEDROCK] and origin_id is null".'),
+    page_size: Optional[int] = typer.Option(None, "--page-size", help="Max agents per page (1-1000)."),
+    continuation_token: Optional[str] = typer.Option(None, "--continuation-token"),
+    output: Optional[str] = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
+) -> None:
+    """Search agents by filter expression (fields: id, type, origin_id, spiffeId)."""
+    fmt = (output or _fmt()).lower()
+    req = SearchAgentsRequest(
+        filter=filter, page_size=page_size, continuation_token=continuation_token
+    )
+    try:
+        with _client() as client:
+            result = client.agents.search(req)
+    except SecAIError as exc:
+        _die(exc)
+        return
+
+    if fmt == "quiet":
+        for a in result.agents:
+            typer.echo(a.id or "")
+        return
+
+    from rich import print_json
+    print_json(json.dumps(result.model_dump(by_alias=True), default=str))
+
+
+# ---------------------------------------------------------------------------
+# agents summary
+# ---------------------------------------------------------------------------
+
+
+@agents_app.command("summary")
+def agents_summary(
+    output: Optional[str] = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
+) -> None:
+    """Show agent counts by type, by connection status, and SPIFFE/JWT counts."""
+    try:
+        with _client() as client:
+            result = client.agents.summary()
+    except SecAIError as exc:
+        _die(exc)
+        return
+
+    if (output or _fmt()).lower() == "json":
+        from rich import print_json
+        print_json(json.dumps(result.model_dump(by_alias=True), default=str))
+        return
+
+    console.print(f"[bold]Total agents:[/bold] {result.types.total if result.types else '—'}")
+    console.print(f"  SPIFFE agents: {result.spiffe_count}")
+    console.print(f"  JWT agents   : {result.jwt_count}")
+    if result.types:
+        console.print("  By type:")
+        for item in result.types.items:
+            console.print(f"    {item.display_text or item.key}: {item.total}")
+    if result.statuses:
+        console.print("  By status:")
+        for item in result.statuses.items:
+            console.print(f"    {item.display_text or item.key}: {item.total}")
+
+
+# ---------------------------------------------------------------------------
+# agents authn-descriptors list / delete
+# ---------------------------------------------------------------------------
+
+
+@agents_app.command("list-authn-descriptors")
+def agents_list_authn_descriptors(
+    ctx: typer.Context,
+    agent_id: Optional[str] = typer.Argument(None, help="Agent UUID. [required]"),
+    output: Optional[str] = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
+) -> None:
+    """List all authentication descriptors registered for an agent."""
+    _help_if_missing(ctx, agent_id=agent_id)
+    try:
+        with _client() as client:
+            descriptors = client.agents.list_authn_descriptors(agent_id)
+    except SecAIError as exc:
+        _die(exc)
+        return
+
+    if (output or _fmt()).lower() == "quiet":
+        for d in descriptors:
+            typer.echo(d.id)
+        return
+
+    from rich import print_json
+    print_json(json.dumps([d.model_dump(by_alias=True) for d in descriptors], default=str))
+
+
+@agents_app.command("delete-authn-descriptor")
+def agents_delete_authn_descriptor(
+    ctx: typer.Context,
+    agent_id: Optional[str] = typer.Argument(None, help="Agent UUID. [required]"),
+    descriptor_id: Optional[str] = typer.Argument(None, help="Authentication descriptor UUID. [required]"),
+    confirm: bool = typer.Option(False, "--confirm", help="Required to proceed with deletion."),
+) -> None:
+    """Remove an authentication descriptor from an agent."""
+    _help_if_missing(ctx, agent_id=agent_id, descriptor_id=descriptor_id)
+    if not confirm:
+        err_console.print("[yellow]Pass --confirm to proceed with deletion.[/yellow]")
+        raise typer.Exit(1)
+    try:
+        with _client() as client:
+            client.agents.delete_authn_descriptor(agent_id, descriptor_id)
+    except SecAIError as exc:
+        _die(exc)
+        return
+    console.print(f"[bold green]Descriptor deleted:[/bold green] {descriptor_id}")
 
 
 # ---------------------------------------------------------------------------
@@ -155,7 +288,7 @@ def agents_list(
 def agents_register(
     ctx: typer.Context,
     name: Optional[str] = typer.Option(None, "--name", "-n", help="Agent name, unique, alphanumeric. [required]"),
-    type_: Optional[str] = typer.Option(None, "--type", "-t", help="Agent type: CHATGPT, CLAUDE, GEMINI, COPILOT, CUSTOM, etc. [required]"),
+    type_: Optional[str] = typer.Option(None, "--type", "-t", help="Agent type (free-form, 2-256 chars), e.g. CLAUDE, COPILOT, AWS_BEDROCK, CUSTOM. [required]"),
     description: Optional[str] = typer.Option(None, "--description", "-d"),
     owner: Optional[str] = typer.Option(None, "--owner"),
     callback_url: Optional[list[str]] = typer.Option(None, "--callback-url", help="Redirect callback URL (repeatable, must start with https://)."),
@@ -280,6 +413,15 @@ def agents_edit(
             agent = client.agents.edit(agent_id, req)
     except SecAIError as exc:
         _die(exc)
+        return
+
+    if agent is None:
+        if fmt == "quiet":
+            typer.echo(agent_id)
+            return
+        console.print(
+            f"[dim]No changes: request matches the stored agent {agent_id}; nothing was written.[/dim]"
+        )
         return
 
     if fmt == "quiet":

@@ -53,6 +53,10 @@ class RateLimitError(SecAIError):
     """HTTP 429 — too many requests; back off and retry."""
 
 
+class NotAcceptableError(SecAIError):
+    """HTTP 406 — missing or invalid ``Accept`` header for this beta API."""
+
+
 class ServerError(SecAIError):
     """HTTP 5xx — an unexpected error occurred on the server."""
 
@@ -65,6 +69,7 @@ _STATUS_MAP: dict[int, type[SecAIError]] = {
     401: AuthenticationError,
     403: AuthorizationError,
     404: NotFoundError,
+    406: NotAcceptableError,
     409: ConflictError,
     422: ValidationError,
     429: RateLimitError,

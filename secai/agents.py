@@ -2,16 +2,20 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+import builtins
+from typing import TYPE_CHECKING, Any, Optional
 
 from .models import (
     Agent,
+    AgentsSummary,
     AgentState,
     AgentStateResponse,
     AgentWithCredentials,
+    AuthnDescriptorOutput,
     EditAgentRequest,
     ListAgentsResponse,
     RegisterAgentRequest,
+    SearchAgentsRequest,
 )
 
 if TYPE_CHECKING:
@@ -30,10 +34,56 @@ class AgentsResource:
     # GET /api/agents
     # ------------------------------------------------------------------
 
-    def list(self) -> list[Agent]:
-        """Return all agents in the tenant."""
-        body = self._t._request("GET", "/api/agents", accept=_ACCEPT)
-        return ListAgentsResponse.model_validate(body).agents
+    def list(
+        self,
+        *,
+        page_size: Optional[int] = None,
+        continuation_token: Optional[str] = None,
+    ) -> ListAgentsResponse:
+        """Return a page of agents in the tenant.
+
+        *page_size* (1-1000) and *continuation_token* (from a previous
+        response's ``page_info.continuation_token``) support cursor-based
+        pagination. Returns the full :class:`~secai.models.ListAgentsResponse`
+        (``agents``, ``page_info``, ``total_count``) so callers can fetch
+        subsequent pages.
+        """
+        params: dict[str, Any] = {}
+        if page_size is not None:
+            params["pageSize"] = page_size
+        if continuation_token is not None:
+            params["continuationToken"] = continuation_token
+        body = self._t._request(
+            "GET", "/api/agents", accept=_ACCEPT, params=params or None
+        )
+        return ListAgentsResponse.model_validate(body)
+
+    # ------------------------------------------------------------------
+    # POST /api/agents/search
+    # ------------------------------------------------------------------
+
+    def search(self, request: SearchAgentsRequest) -> ListAgentsResponse:
+        """Search agents with a filter expression.
+
+        Supported filter fields are ``id``, ``type``, ``origin_id``, and
+        ``spiffeId``, e.g. ``"type in [AWS_BEDROCK] and origin_id is null"``.
+        """
+        body = self._t._request(
+            "POST",
+            "/api/agents/search",
+            accept=_ACCEPT,
+            json=request.model_dump(by_alias=True, exclude_unset=True, exclude_none=True),
+        )
+        return ListAgentsResponse.model_validate(body)
+
+    # ------------------------------------------------------------------
+    # GET /api/agents/summary
+    # ------------------------------------------------------------------
+
+    def summary(self) -> AgentsSummary:
+        """Return counts of agents by type and connection status, plus SPIFFE/JWT counts."""
+        body = self._t._request("GET", "/api/agents/summary", accept=_ACCEPT)
+        return AgentsSummary.model_validate(body)
 
     # ------------------------------------------------------------------
     # POST /api/agents
@@ -63,13 +113,15 @@ class AgentsResource:
         return AgentWithCredentials.model_validate(body)
 
     # ------------------------------------------------------------------
-    # PATCH /api/agents/{agentId}
+    # PUT /api/agents/{agentId}
     # ------------------------------------------------------------------
 
-    def edit(self, agent_id: str, request: EditAgentRequest) -> Agent:
-        """Edit agent metadata (name, owner, description, tags).
+    def edit(self, agent_id: str, request: EditAgentRequest) -> Optional[Agent]:
+        """Edit agent metadata (name, owners, description, tags, authnDescriptors).
 
-        Fields not included in *request* are left unchanged.
+        Fields not included in *request* are left unchanged. Returns ``None``
+        if the request matches the stored agent exactly (HTTP 204: nothing is
+        written or audited).
         """
         body = self._t._request(
             "PUT",
@@ -77,7 +129,7 @@ class AgentsResource:
             accept=_ACCEPT,
             json=request.model_dump(by_alias=True, exclude_unset=True, exclude_none=True),
         )
-        return Agent.model_validate(body)
+        return Agent.model_validate(body) if body is not None else None
 
     # ------------------------------------------------------------------
     # DELETE /api/agents/{agentId}
@@ -86,7 +138,7 @@ class AgentsResource:
     def delete(self, agent_id: str) -> None:
         """Permanently delete an agent.
 
-        The agent must be in ``SUSPENDED`` or ``PENDING_CONFIGURATION`` state.
+        The agent must be in ``SUSPENDED`` or ``PENDING_CONNECTION`` state.
         Raises :class:`~secai.exceptions.ConflictError` if the agent is
         ``ACTIVE``.
         """
@@ -110,3 +162,36 @@ class AgentsResource:
             json=payload,
         )
         return AgentStateResponse.model_validate(body)
+
+    # ------------------------------------------------------------------
+    # GET /api/agents/{agentId}/authn-descriptors
+    # ------------------------------------------------------------------
+
+    def list_authn_descriptors(self, agent_id: str) -> builtins.list[AuthnDescriptorOutput]:
+        """List all authentication descriptors registered for an agent.
+
+        ``builtins.list`` is used here (rather than the bare ``list[...]``
+        generic) because this class defines its own ``list()`` method, which
+        would otherwise shadow the builtin in this annotation's lazy
+        evaluation scope.
+        """
+        body = self._t._request(
+            "GET", f"/api/agents/{agent_id}/authn-descriptors", accept=_ACCEPT
+        )
+        return [AuthnDescriptorOutput.model_validate(item) for item in body]
+
+    # ------------------------------------------------------------------
+    # DELETE /api/agents/{agentId}/authn-descriptors/{descriptorId}
+    # ------------------------------------------------------------------
+
+    def delete_authn_descriptor(self, agent_id: str, descriptor_id: str) -> None:
+        """Remove a single authentication descriptor from an agent by its UUID.
+
+        Adding descriptors via this resource is deprecated server-side; use
+        ``register()``'s or ``edit()``'s ``authn_descriptors`` field instead.
+        """
+        self._t._request(
+            "DELETE",
+            f"/api/agents/{agent_id}/authn-descriptors/{descriptor_id}",
+            accept=_ACCEPT,
+        )

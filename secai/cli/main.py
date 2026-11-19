@@ -13,7 +13,6 @@ import typer
 from dotenv import load_dotenv
 from rich import print_json
 from rich.console import Console
-from rich.table import Table
 
 from ..exceptions import SecAIError
 
@@ -72,10 +71,18 @@ def handle_error(exc: SecAIError) -> None:
 # ---------------------------------------------------------------------------
 
 from .agents_cmds import agents_app  # noqa: E402
+from .auth_cmds import login, logout, whoami  # noqa: E402
+from .policies_cmds import policies_app  # noqa: E402
+from .reports_cmds import reports_app  # noqa: E402
 from .targets_cmds import targets_app  # noqa: E402
 
+app.command("login")(login)
+app.command("logout")(logout)
+app.command("whoami")(whoami)
 app.add_typer(agents_app, name="agents", help="Agent inventory and lifecycle management.")
 app.add_typer(targets_app, name="targets", help="MCP server target registry management.")
+app.add_typer(policies_app, name="policies", help="Access policy management.")
+app.add_typer(reports_app, name="reports", help="Insights and activity map reporting.")
 
 
 def _preprocess_argv() -> None:

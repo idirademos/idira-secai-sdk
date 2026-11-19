@@ -113,3 +113,33 @@ def live_mcp_server() -> Generator[dict[str, str], None, None]:
         run_cli("targets", "delete", server_id, "--confirm", check=False)
     except Exception:
         pass
+
+
+# ---------------------------------------------------------------------------
+# Session-scoped policy fixture
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="session")
+def live_policy() -> Generator[dict[str, str], None, None]:
+    """Create a test access policy; yield its id; disable and delete after session."""
+    name = _unique("policy")
+    result = run_cli(
+        "policies", "create",
+        "--name", name,
+        "--access-type", "AUTONOMOUS",
+        "--description", "Created by secai-sdk test suite",
+        "--resource-match", "mcp:test-secai-sdk:*",
+        "--tag", "env=test",
+        "--output", "json",
+    )
+    import json
+    data = json.loads(result.stdout)
+    policy_id: str = data["id"]
+    yield {"id": policy_id, "name": name}
+    # Teardown
+    try:
+        run_cli("policies", "set-state", policy_id, "DISABLED", check=False)
+        run_cli("policies", "delete", policy_id, "--confirm", check=False)
+    except Exception:
+        pass

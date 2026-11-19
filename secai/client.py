@@ -149,10 +149,14 @@ class SecAIClient:
 
         # Lazy-imported to avoid circular references
         from .agents import AgentsResource
+        from .policies import PoliciesResource
+        from .reports import ReportsResource
         from .targets import TargetsResource
 
         self.agents = AgentsResource(self._transport)
         self.targets = TargetsResource(self._transport)
+        self.policies = PoliciesResource(self._transport)
+        self.reports = ReportsResource(self._transport)
 
     def close(self) -> None:
         """Release the underlying HTTP connection pool."""
