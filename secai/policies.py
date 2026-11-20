@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Iterator, Optional
+from collections.abc import Iterator
+from typing import TYPE_CHECKING, Any
 
 from .models import (
     ListPolicyOutput,
@@ -27,7 +28,7 @@ class PoliciesResource:
     when a policy explicitly permits it.
     """
 
-    def __init__(self, transport: "_BaseClient") -> None:
+    def __init__(self, transport: _BaseClient) -> None:
         self._t = transport
 
     # ------------------------------------------------------------------
@@ -37,8 +38,8 @@ class PoliciesResource:
     def list(
         self,
         *,
-        page_size: Optional[int] = None,
-        cursor: Optional[str] = None,
+        page_size: int | None = None,
+        cursor: str | None = None,
     ) -> ListPolicyOutput:
         """Return a page of access policies (cursor-paginated, 50 per page by default).
 
@@ -50,22 +51,20 @@ class PoliciesResource:
             params["pageSize"] = page_size
         if cursor:
             params["cursor"] = cursor
-        body = self._t._request(
-            "GET", "/api/policies", accept=_ACCEPT, params=params or None
-        )
+        body = self._t._request("GET", "/api/policies", accept=_ACCEPT, params=params or None)
         return ListPolicyOutput.model_validate(body)
 
     # ------------------------------------------------------------------
     # GET /api/policies (pagination helper)
     # ------------------------------------------------------------------
 
-    def iter_all(self, *, page_size: Optional[int] = None) -> Iterator[PolicyOutput]:
+    def iter_all(self, *, page_size: int | None = None) -> Iterator[PolicyOutput]:
         """Yield every access policy in the tenant, transparently paging through results.
 
         Equivalent to repeatedly calling :meth:`list` and following
         ``next_cursor`` until the server stops returning one.
         """
-        cursor: Optional[str] = None
+        cursor: str | None = None
         while True:
             page = self.list(page_size=page_size, cursor=cursor)
             yield from page.policies

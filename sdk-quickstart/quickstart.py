@@ -26,6 +26,7 @@ import sys
 # Load a .env file if present
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:
     pass
@@ -94,7 +95,10 @@ def main() -> None:
     print(f"  State      : {new_agent.status.state.value if new_agent.status else '—'}")
     if new_agent.credentials:
         print(f"  Client ID  : {new_agent.credentials.client_id or '—'}")
-        print(f"  Secret     : {new_agent.credentials.client_secret or '—'}  ← store securely; shown once")
+        print(
+            f"  Secret     : {new_agent.credentials.client_secret or '—'}  "
+            "← store securely; shown once"
+        )
         print(f"  Gateway    : {new_agent.credentials.gateway_url or '—'}")
 
     # -----------------------------------------------------------------------

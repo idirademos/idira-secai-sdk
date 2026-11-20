@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "secai"
-version = "0.2.0"
+version = "0.2.1"
 description = "Idira Secure AI Python SDK — to automate AI agent & MCP target inventory management"
 readme = "README.md"
 license = { text = "Apache-2.0" }
@@ -63,6 +63,11 @@ target-version = "py39"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
 
+[tool.ruff.lint.flake8-bugbear]
+# typer.Option()/typer.Argument() as a default is the required Typer pattern
+# (not a mutable-default bug), so B008 is a false positive for these calls.
+extend-immutable-calls = ["typer.Option", "typer.Argument"]
+
 [tool.mypy]
 strict = true
-python_version = "3.9"
+python_version = "3.10"

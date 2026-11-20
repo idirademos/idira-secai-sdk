@@ -8,7 +8,7 @@ import random
 import sys
 import time
 from email.utils import parsedate_to_datetime
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 import httpx
 
@@ -37,7 +37,7 @@ class _BaseClient:
         max_retries: int = 3,
         backoff_factor: float = 0.5,
         max_backoff: float = 8.0,
-        token_refresher: Optional[Callable[[], str]] = None,
+        token_refresher: Callable[[], str] | None = None,
     ) -> None:
         # Strip trailing slash, then strip a trailing /api if present.
         # All resource paths already begin with /api/, so including it in
@@ -88,8 +88,8 @@ class _BaseClient:
         path: str,
         *,
         accept: str,
-        json: Optional[Any] = None,
-        params: Optional[dict[str, Any]] = None,
+        json: Any | None = None,
+        params: dict[str, Any] | None = None,
     ) -> Any:
         """Execute a request and return the parsed JSON body (or None for 204).
 
@@ -194,7 +194,7 @@ class _BaseClient:
     def close(self) -> None:
         self._http.close()
 
-    def __enter__(self) -> "_BaseClient":
+    def __enter__(self) -> _BaseClient:
         return self
 
     def __exit__(self, *_: Any) -> None:
@@ -225,27 +225,23 @@ class SecAIClient:
 
     def __init__(
         self,
-        tenant_url: Optional[str] = None,
-        token: Optional[str] = None,
+        tenant_url: str | None = None,
+        token: str | None = None,
         *,
         timeout: float = 30.0,
         verify_ssl: bool = True,
         max_retries: int = 3,
         backoff_factor: float = 0.5,
         max_backoff: float = 8.0,
-        token_refresher: Optional[Callable[[], str]] = None,
+        token_refresher: Callable[[], str] | None = None,
     ) -> None:
         resolved_url = tenant_url or os.environ.get("SECAI_TENANT_URL", "")
         resolved_token = token or os.environ.get("SECAI_TOKEN", "")
 
         if not resolved_url:
-            raise ValueError(
-                "tenant_url must be provided or SECAI_TENANT_URL must be set."
-            )
+            raise ValueError("tenant_url must be provided or SECAI_TENANT_URL must be set.")
         if not resolved_token:
-            raise ValueError(
-                "token must be provided or SECAI_TOKEN must be set."
-            )
+            raise ValueError("token must be provided or SECAI_TOKEN must be set.")
 
         self._transport = _BaseClient(
             resolved_url,
@@ -273,7 +269,7 @@ class SecAIClient:
         """Release the underlying HTTP connection pool."""
         self._transport.close()
 
-    def __enter__(self) -> "SecAIClient":
+    def __enter__(self) -> SecAIClient:
         return self
 
     def __exit__(self, *_: Any) -> None:

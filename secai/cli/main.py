@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import shlex
@@ -120,10 +121,9 @@ def _preprocess_argv() -> None:
     """
     args = sys.argv[1:]
     if any('"' in arg or "'" in arg for arg in args):
-        try:
+        # malformed quoting — leave argv alone and let Click report it
+        with contextlib.suppress(ValueError):
             sys.argv[1:] = shlex.split(" ".join(args))
-        except ValueError:
-            pass  # malformed quoting — leave argv alone and let Click report it
 
 
 def main() -> None:

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import os
 import sys
-from typing import Optional
+from typing import Any
 
 import typer
 from rich.console import Console
@@ -91,19 +91,19 @@ def _help_if_missing(ctx: typer.Context, **named_values: object) -> None:
 
 @agents_app.command("list")
 def agents_list(
-    page_size: Optional[int] = typer.Option(None, "--page-size", help="Max agents per page (1-1000)."),
-    continuation_token: Optional[str] = typer.Option(
-        None, "--continuation-token", help="Continuation token from a previous response's page_info."
+    page_size: int | None = typer.Option(None, "--page-size", help="Max agents per page (1-1000)."),
+    continuation_token: str | None = typer.Option(
+        None,
+        "--continuation-token",
+        help="Continuation token from a previous response's page_info.",
     ),
-    output: Optional[str] = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
+    output: str | None = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
 ) -> None:
     """List agents in the tenant (one page; use --continuation-token for more)."""
     fmt = (output or _fmt()).lower()
     try:
         with _client() as client:
-            result = client.agents.list(
-                page_size=page_size, continuation_token=continuation_token
-            )
+            result = client.agents.list(page_size=page_size, continuation_token=continuation_token)
     except SecAIError as exc:
         _die(exc)
         return
@@ -119,6 +119,7 @@ def agents_list(
         import json
 
         from rich import print_json
+
         print_json(json.dumps(result.model_dump(by_alias=True), default=str))
         return
 
@@ -170,15 +171,17 @@ def agents_list(
 
 @agents_app.command("search")
 def agents_search(
-    filter: str = typer.Argument(..., help='Filter expression, e.g. "type in [AWS_BEDROCK] and origin_id is null".'),
-    page_size: Optional[int] = typer.Option(None, "--page-size", help="Max agents per page (1-1000)."),
-    continuation_token: Optional[str] = typer.Option(None, "--continuation-token"),
-    output: Optional[str] = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
+    filter: str = typer.Argument(
+        ..., help='Filter expression, e.g. "type in [AWS_BEDROCK] and origin_id is null".'
+    ),
+    page_size: int | None = typer.Option(None, "--page-size", help="Max agents per page (1-1000)."),
+    continuation_token: str | None = typer.Option(None, "--continuation-token"),
+    output: str | None = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
 ) -> None:
     """Search agents by filter expression (fields: id, type, origin_id, spiffeId)."""
     fmt = (output or _fmt()).lower()
     req = SearchAgentsRequest(
-        filter=filter, page_size=page_size, continuation_token=continuation_token
+        filter=filter, pageSize=page_size, continuationToken=continuation_token
     )
     try:
         with _client() as client:
@@ -193,6 +196,7 @@ def agents_search(
         return
 
     from rich import print_json
+
     print_json(json.dumps(result.model_dump(by_alias=True), default=str))
 
 
@@ -203,7 +207,7 @@ def agents_search(
 
 @agents_app.command("summary")
 def agents_summary(
-    output: Optional[str] = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
+    output: str | None = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
 ) -> None:
     """Show agent counts by type, by connection status, and SPIFFE/JWT counts."""
     try:
@@ -215,6 +219,7 @@ def agents_summary(
 
     if (output or _fmt()).lower() == "json":
         from rich import print_json
+
         print_json(json.dumps(result.model_dump(by_alias=True), default=str))
         return
 
@@ -239,11 +244,12 @@ def agents_summary(
 @agents_app.command("list-authn-descriptors")
 def agents_list_authn_descriptors(
     ctx: typer.Context,
-    agent_id: Optional[str] = typer.Argument(None, help="Agent UUID. [required]"),
-    output: Optional[str] = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
+    agent_id: str | None = typer.Argument(None, help="Agent UUID. [required]"),
+    output: str | None = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
 ) -> None:
     """List all authentication descriptors registered for an agent."""
     _help_if_missing(ctx, agent_id=agent_id)
+    assert agent_id is not None
     try:
         with _client() as client:
             descriptors = client.agents.list_authn_descriptors(agent_id)
@@ -257,18 +263,23 @@ def agents_list_authn_descriptors(
         return
 
     from rich import print_json
+
     print_json(json.dumps([d.model_dump(by_alias=True) for d in descriptors], default=str))
 
 
 @agents_app.command("delete-authn-descriptor")
 def agents_delete_authn_descriptor(
     ctx: typer.Context,
-    agent_id: Optional[str] = typer.Argument(None, help="Agent UUID. [required]"),
-    descriptor_id: Optional[str] = typer.Argument(None, help="Authentication descriptor UUID. [required]"),
+    agent_id: str | None = typer.Argument(None, help="Agent UUID. [required]"),
+    descriptor_id: str | None = typer.Argument(
+        None, help="Authentication descriptor UUID. [required]"
+    ),
     confirm: bool = typer.Option(False, "--confirm", help="Required to proceed with deletion."),
 ) -> None:
     """Remove an authentication descriptor from an agent."""
     _help_if_missing(ctx, agent_id=agent_id, descriptor_id=descriptor_id)
+    assert agent_id is not None
+    assert descriptor_id is not None
     if not confirm:
         err_console.print("[yellow]Pass --confirm to proceed with deletion.[/yellow]")
         raise typer.Exit(1)
@@ -289,22 +300,38 @@ def agents_delete_authn_descriptor(
 @agents_app.command("register")
 def agents_register(
     ctx: typer.Context,
-    name: Optional[str] = typer.Option(None, "--name", "-n", help="Agent name, unique, alphanumeric. [required]"),
-    type_: Optional[str] = typer.Option(None, "--type", "-t", help="Agent type (free-form, 2-256 chars), e.g. CLAUDE, COPILOT, AWS_BEDROCK, CUSTOM. [required]"),
-    description: Optional[str] = typer.Option(None, "--description", "-d"),
-    owner: Optional[str] = typer.Option(None, "--owner"),
-    callback_url: Optional[list[str]] = typer.Option(None, "--callback-url", help="Redirect callback URL (repeatable, must start with https://)."),
-    tag: Optional[list[str]] = typer.Option(None, "--tag", help="Tag as KEY=VALUE (repeatable)."),
-    owner_id: Optional[list[str]] = typer.Option(None, "--owner-id", help="Owner user ID (repeatable)."),
-    output: Optional[str] = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
+    name: str | None = typer.Option(
+        None, "--name", "-n", help="Agent name, unique, alphanumeric. [required]"
+    ),
+    type_: str | None = typer.Option(
+        None,
+        "--type",
+        "-t",
+        help=(
+            "Agent type (free-form, 2-256 chars), e.g. CLAUDE, COPILOT, "
+            "AWS_BEDROCK, CUSTOM. [required]"
+        ),
+    ),
+    description: str | None = typer.Option(None, "--description", "-d"),
+    owner: str | None = typer.Option(None, "--owner"),
+    callback_url: list[str] | None = typer.Option(
+        None, "--callback-url", help="Redirect callback URL (repeatable, must start with https://)."
+    ),
+    tag: list[str] | None = typer.Option(None, "--tag", help="Tag as KEY=VALUE (repeatable)."),
+    owner_id: list[str] | None = typer.Option(
+        None, "--owner-id", help="Owner user ID (repeatable)."
+    ),
+    output: str | None = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
 ) -> None:
     """Register a new AI agent and print its credentials."""
     _help_if_missing(ctx, name=name, type_=type_)
+    assert name is not None
+    assert type_ is not None
     fmt = (output or _fmt()).lower()
     # Only pass fields that carry real values so Pydantic treats unset fields
     # as unset — model_dump(exclude_unset=True) then omits them from the payload,
     # preventing empty-collection schema-validation errors from the server.
-    req_kwargs: dict[str, object] = {"name": name, "type": type_}
+    req_kwargs: dict[str, Any] = {"name": name, "type": type_}
     if description is not None:
         req_kwargs["description"] = description
     if owner is not None:
@@ -329,6 +356,7 @@ def agents_register(
 
     if fmt == "json":
         from rich import print_json
+
         print_json(json.dumps(agent.model_dump(by_alias=True), default=str))
         return
 
@@ -338,7 +366,10 @@ def agents_register(
     console.print(f"  State       : {agent.status.state.value if agent.status else '—'}")
     if agent.credentials:
         console.print(f"  Client ID   : {agent.credentials.client_id}")
-        console.print(f"  [bold red]Client Secret[/bold red]: {agent.credentials.client_secret}  [dim](store securely — shown once)[/dim]")
+        console.print(
+            f"  [bold red]Client Secret[/bold red]: {agent.credentials.client_secret}  "
+            "[dim](store securely — shown once)[/dim]"
+        )
         console.print(f"  Gateway URL : {agent.credentials.gateway_url}")
 
 
@@ -350,11 +381,12 @@ def agents_register(
 @agents_app.command("get")
 def agents_get(
     ctx: typer.Context,
-    agent_id: Optional[str] = typer.Argument(None, help="Agent UUID. [required]"),
-    output: Optional[str] = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
+    agent_id: str | None = typer.Argument(None, help="Agent UUID. [required]"),
+    output: str | None = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
 ) -> None:
     """Get full details for a single agent."""
     _help_if_missing(ctx, agent_id=agent_id)
+    assert agent_id is not None
     fmt = (output or _fmt()).lower()
     try:
         with _client() as client:
@@ -369,6 +401,7 @@ def agents_get(
 
     if fmt == "json":
         from rich import print_json
+
         print_json(json.dumps(agent.model_dump(by_alias=True), default=str))
         return
 
@@ -394,15 +427,18 @@ def agents_get(
 @agents_app.command("edit")
 def agents_edit(
     ctx: typer.Context,
-    agent_id: Optional[str] = typer.Argument(None, help="Agent UUID. [required]"),
-    name: Optional[str] = typer.Option(None, "--name", "-n"),
-    description: Optional[str] = typer.Option(None, "--description", "-d"),
-    owner: Optional[str] = typer.Option(None, "--owner"),
-    tag: Optional[list[str]] = typer.Option(None, "--tag", help="TAG=VALUE (repeatable). Replaces all tags."),
-    output: Optional[str] = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
+    agent_id: str | None = typer.Argument(None, help="Agent UUID. [required]"),
+    name: str | None = typer.Option(None, "--name", "-n"),
+    description: str | None = typer.Option(None, "--description", "-d"),
+    owner: str | None = typer.Option(None, "--owner"),
+    tag: list[str] | None = typer.Option(
+        None, "--tag", help="TAG=VALUE (repeatable). Replaces all tags."
+    ),
+    output: str | None = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
 ) -> None:
     """Edit agent metadata (name, owner, description, tags)."""
     _help_if_missing(ctx, agent_id=agent_id)
+    assert agent_id is not None
     fmt = (output or _fmt()).lower()
     req = EditAgentRequest(
         name=name,
@@ -422,7 +458,8 @@ def agents_edit(
             typer.echo(agent_id)
             return
         console.print(
-            f"[dim]No changes: request matches the stored agent {agent_id}; nothing was written.[/dim]"
+            f"[dim]No changes: request matches the stored agent {agent_id}; "
+            "nothing was written.[/dim]"
         )
         return
 
@@ -432,6 +469,7 @@ def agents_edit(
 
     if fmt == "json":
         from rich import print_json
+
         print_json(json.dumps(agent.model_dump(by_alias=True), default=str))
         return
 
@@ -448,11 +486,12 @@ def agents_edit(
 @agents_app.command("delete")
 def agents_delete(
     ctx: typer.Context,
-    agent_id: Optional[str] = typer.Argument(None, help="Agent UUID. [required]"),
+    agent_id: str | None = typer.Argument(None, help="Agent UUID. [required]"),
     confirm: bool = typer.Option(False, "--confirm", help="Required to proceed with deletion."),
 ) -> None:
     """Permanently delete an agent (must be SUSPENDED first)."""
     _help_if_missing(ctx, agent_id=agent_id)
+    assert agent_id is not None
     if not confirm:
         err_console.print("[yellow]Pass --confirm to proceed with deletion.[/yellow]")
         raise typer.Exit(1)
@@ -473,12 +512,16 @@ def agents_delete(
 @agents_app.command("set-state")
 def agents_set_state(
     ctx: typer.Context,
-    agent_id: Optional[str] = typer.Argument(None, help="Agent UUID. [required]"),
-    state: Optional[AgentState] = typer.Argument(None, help="Target state: ACTIVE or SUSPENDED. [required]"),
-    output: Optional[str] = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
+    agent_id: str | None = typer.Argument(None, help="Agent UUID. [required]"),
+    state: AgentState | None = typer.Argument(
+        None, help="Target state: ACTIVE or SUSPENDED. [required]"
+    ),
+    output: str | None = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
 ) -> None:
     """Transition an agent between ACTIVE and SUSPENDED."""
     _help_if_missing(ctx, agent_id=agent_id, state=state)
+    assert agent_id is not None
+    assert state is not None
     fmt = (output or _fmt()).lower()
     try:
         with _client() as client:
@@ -493,6 +536,7 @@ def agents_set_state(
 
     if fmt == "json":
         from rich import print_json
+
         print_json(json.dumps(result.model_dump(by_alias=True), default=str))
         return
 

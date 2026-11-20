@@ -17,7 +17,6 @@ import pytest
 
 from .conftest import run_cli
 
-
 # ---------------------------------------------------------------------------
 # List agents
 # ---------------------------------------------------------------------------
@@ -56,10 +55,14 @@ class TestAgentsRegister:
     def test_register_returns_credentials(self) -> None:
         name = f"test-secai-sdk-reg-{uuid.uuid4().hex[:6]}"
         result = run_cli(
-            "agents", "register",
-            "--name", name,
-            "--type", "COPILOT",
-            "--output", "json",
+            "agents",
+            "register",
+            "--name",
+            name,
+            "--type",
+            "COPILOT",
+            "--output",
+            "json",
         )
         assert result.returncode == 0
         data = json.loads(result.stdout)
@@ -76,10 +79,14 @@ class TestAgentsRegister:
     def test_register_quiet_outputs_id(self) -> None:
         name = f"test-secai-sdk-quiet-{uuid.uuid4().hex[:6]}"
         result = run_cli(
-            "agents", "register",
-            "--name", name,
-            "--type", "COPILOT",
-            "--output", "quiet",
+            "agents",
+            "register",
+            "--name",
+            name,
+            "--type",
+            "COPILOT",
+            "--output",
+            "quiet",
         )
         assert result.returncode == 0
         agent_id = result.stdout.strip()
@@ -91,12 +98,18 @@ class TestAgentsRegister:
     def test_register_with_tags(self) -> None:
         name = f"test-secai-sdk-tags-{uuid.uuid4().hex[:6]}"
         result = run_cli(
-            "agents", "register",
-            "--name", name,
-            "--type", "COPILOT",
-            "--tag", "env=test",
-            "--tag", "team=sdk",
-            "--output", "json",
+            "agents",
+            "register",
+            "--name",
+            name,
+            "--type",
+            "COPILOT",
+            "--tag",
+            "env=test",
+            "--tag",
+            "team=sdk",
+            "--output",
+            "json",
         )
         assert result.returncode == 0
         data = json.loads(result.stdout)
@@ -110,13 +123,20 @@ class TestAgentsRegister:
     def test_register_duplicate_name_returns_error(self, live_agent: dict) -> None:
         """Registering with the same name should fail with a 409 ConflictError."""
         result = run_cli(
-            "agents", "register",
-            "--name", live_agent["name"],
-            "--type", "COPILOT",
+            "agents",
+            "register",
+            "--name",
+            live_agent["name"],
+            "--type",
+            "COPILOT",
             check=False,
         )
         assert result.returncode != 0
-        assert "409" in result.stderr or "CONFLICT" in result.stderr.upper() or "conflict" in result.stderr.lower()
+        assert (
+            "409" in result.stderr
+            or "CONFLICT" in result.stderr.upper()
+            or "conflict" in result.stderr.lower()
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -156,9 +176,13 @@ class TestAgentsGet:
 class TestAgentsEdit:
     def test_edit_description(self, live_agent: dict) -> None:
         result = run_cli(
-            "agents", "edit", live_agent["id"],
-            "--description", "Updated by test suite",
-            "--output", "json",
+            "agents",
+            "edit",
+            live_agent["id"],
+            "--description",
+            "Updated by test suite",
+            "--output",
+            "json",
         )
         assert result.returncode == 0
         data = json.loads(result.stdout)
@@ -166,10 +190,15 @@ class TestAgentsEdit:
 
     def test_edit_tags(self, live_agent: dict) -> None:
         result = run_cli(
-            "agents", "edit", live_agent["id"],
-            "--tag", "env=test",
-            "--tag", "suite=agents",
-            "--output", "json",
+            "agents",
+            "edit",
+            live_agent["id"],
+            "--tag",
+            "env=test",
+            "--tag",
+            "suite=agents",
+            "--output",
+            "json",
         )
         assert result.returncode == 0
         data = json.loads(result.stdout)
@@ -182,9 +211,13 @@ class TestAgentsEdit:
         # Verify that --owner is accepted without error and returns a valid
         # agent record with the correct ID.
         result = run_cli(
-            "agents", "edit", live_agent["id"],
-            "--owner", "SDK Test Suite",
-            "--output", "json",
+            "agents",
+            "edit",
+            live_agent["id"],
+            "--owner",
+            "SDK Test Suite",
+            "--output",
+            "json",
         )
         assert result.returncode == 0
         data = json.loads(result.stdout)
@@ -200,8 +233,12 @@ class TestAgentsSetState:
     def test_set_state_suspended(self, live_agent: dict) -> None:
         run_cli("agents", "set-state", live_agent["id"], "ACTIVE", check=False)
         result = run_cli(
-            "agents", "set-state", live_agent["id"], "SUSPENDED",
-            "--output", "json",
+            "agents",
+            "set-state",
+            live_agent["id"],
+            "SUSPENDED",
+            "--output",
+            "json",
         )
         assert result.returncode == 0
         data = json.loads(result.stdout)
@@ -209,8 +246,12 @@ class TestAgentsSetState:
 
     def test_set_state_active(self, live_agent: dict) -> None:
         result = run_cli(
-            "agents", "set-state", live_agent["id"], "ACTIVE",
-            "--output", "json",
+            "agents",
+            "set-state",
+            live_agent["id"],
+            "ACTIVE",
+            "--output",
+            "json",
         )
         assert result.returncode == 0
         data = json.loads(result.stdout)
@@ -240,10 +281,14 @@ class TestAgentsDelete:
         """Full lifecycle: register → suspend → delete."""
         name = f"test-secai-sdk-del-{uuid.uuid4().hex[:6]}"
         reg = run_cli(
-            "agents", "register",
-            "--name", name,
-            "--type", "COPILOT",
-            "--output", "json",
+            "agents",
+            "register",
+            "--name",
+            name,
+            "--type",
+            "COPILOT",
+            "--output",
+            "json",
         )
         agent_id = json.loads(reg.stdout)["id"]
 

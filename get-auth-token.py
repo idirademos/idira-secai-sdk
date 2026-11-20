@@ -3,8 +3,8 @@
 
 import os
 import sys
+
 import requests
-from urllib.parse import urlparse, urlunparse
 
 # IDIRA_IDENTITY_URL points to the IDIRA REST API (…/api/idadmin).
 IDENTITY_URL = os.environ["IDIRA_IDENTITY_URL"]

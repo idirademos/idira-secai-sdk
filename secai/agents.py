@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import builtins
-from typing import TYPE_CHECKING, Any, Iterator, Optional
+from collections.abc import Iterator
+from typing import TYPE_CHECKING, Any
 
 from .models import (
     Agent,
@@ -27,7 +28,7 @@ _ACCEPT = "application/x.agents.beta+json"
 class AgentsResource:
     """Provides access to all Agents API operations."""
 
-    def __init__(self, transport: "_BaseClient") -> None:
+    def __init__(self, transport: _BaseClient) -> None:
         self._t = transport
 
     # ------------------------------------------------------------------
@@ -37,8 +38,8 @@ class AgentsResource:
     def list(
         self,
         *,
-        page_size: Optional[int] = None,
-        continuation_token: Optional[str] = None,
+        page_size: int | None = None,
+        continuation_token: str | None = None,
     ) -> ListAgentsResponse:
         """Return a page of agents in the tenant.
 
@@ -53,22 +54,20 @@ class AgentsResource:
             params["pageSize"] = page_size
         if continuation_token is not None:
             params["continuationToken"] = continuation_token
-        body = self._t._request(
-            "GET", "/api/agents", accept=_ACCEPT, params=params or None
-        )
+        body = self._t._request("GET", "/api/agents", accept=_ACCEPT, params=params or None)
         return ListAgentsResponse.model_validate(body)
 
     # ------------------------------------------------------------------
     # GET /api/agents (pagination helper)
     # ------------------------------------------------------------------
 
-    def iter_all(self, *, page_size: Optional[int] = None) -> Iterator[Agent]:
+    def iter_all(self, *, page_size: int | None = None) -> Iterator[Agent]:
         """Yield every agent in the tenant, transparently paging through results.
 
         Equivalent to repeatedly calling :meth:`list` and following
         ``page_info.continuation_token`` until the server stops returning one.
         """
-        continuation_token: Optional[str] = None
+        continuation_token: str | None = None
         while True:
             page = self.list(page_size=page_size, continuation_token=continuation_token)
             yield from page.agents
@@ -134,7 +133,7 @@ class AgentsResource:
     # PUT /api/agents/{agentId}
     # ------------------------------------------------------------------
 
-    def edit(self, agent_id: str, request: EditAgentRequest) -> Optional[Agent]:
+    def edit(self, agent_id: str, request: EditAgentRequest) -> Agent | None:
         """Edit agent metadata (name, owners, description, tags, authnDescriptors).
 
         Fields not included in *request* are left unchanged. Returns ``None``
@@ -193,9 +192,7 @@ class AgentsResource:
         would otherwise shadow the builtin in this annotation's lazy
         evaluation scope.
         """
-        body = self._t._request(
-            "GET", f"/api/agents/{agent_id}/authn-descriptors", accept=_ACCEPT
-        )
+        body = self._t._request("GET", f"/api/agents/{agent_id}/authn-descriptors", accept=_ACCEPT)
         return [AuthnDescriptorOutput.model_validate(item) for item in body]
 
     # ------------------------------------------------------------------

@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import os
 import sys
-from typing import Optional
 
 import typer
 from rich.console import Console
@@ -47,8 +46,10 @@ def _die(exc: SecAIError) -> None:
 
 @reports_app.command("activity-map")
 def reports_activity_map(
-    format: Optional[str] = typer.Option(None, "--format", "-f", help="Output file format: html (default) or json."),
-    output: Optional[str] = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
+    format: str | None = typer.Option(
+        None, "--format", "-f", help="Output file format: html (default) or json."
+    ),
+    output: str | None = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
 ) -> None:
     """Get a short-lived presigned download URL for the tenant's insights and activity map."""
     fmt = (output or _fmt()).lower()
@@ -65,6 +66,7 @@ def reports_activity_map(
 
     if fmt == "json":
         from rich import print_json
+
         print_json(json.dumps(report.model_dump(by_alias=True), default=str))
         return
 

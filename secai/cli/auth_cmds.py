@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-from typing import Optional
 
 import typer
 from httpx import HTTPError
@@ -25,29 +24,29 @@ err_console = Console(stderr=True)
 
 
 def login(
-    tenant_url: Optional[str] = typer.Option(
+    tenant_url: str | None = typer.Option(
         None,
         "--tenant-url",
         help="Secure AI API tenant base URL, e.g. https://mytenant.aigw.cyberark.cloud "
         "(default: $SECAI_TENANT_URL)",
     ),
-    token: Optional[str] = typer.Option(
+    token: str | None = typer.Option(
         None,
         "--token",
         help="Bearer token, if you already have one. Skips the OAuth2 exchange below.",
     ),
-    identity_url: Optional[str] = typer.Option(
+    identity_url: str | None = typer.Option(
         None,
         "--identity-url",
         help="CyberArk Identity API base URL, e.g. https://mytenant.cyberark.cloud/api/idadmin "
         "(default: $IDIRA_IDENTITY_URL)",
     ),
-    client_id: Optional[str] = typer.Option(
+    client_id: str | None = typer.Option(
         None,
         "--client-id",
         help="OAuth service account client ID (default: $IDIRA_ADMIN_USER)",
     ),
-    client_secret: Optional[str] = typer.Option(
+    client_secret: str | None = typer.Option(
         None,
         "--client-secret",
         help="OAuth service account client secret (default: $IDIRA_ADMIN_PWD)",

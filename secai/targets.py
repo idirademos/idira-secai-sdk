@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Iterator, Optional, Union
+from collections.abc import Iterator
+from typing import TYPE_CHECKING, Any
 
 from .models import (
     EditMcpServerRequest,
@@ -24,7 +25,7 @@ _ACCEPT = "application/x.targets.beta+json"
 class TargetsResource:
     """Provides access to all Targets API operations."""
 
-    def __init__(self, transport: "_BaseClient") -> None:
+    def __init__(self, transport: _BaseClient) -> None:
         self._t = transport
 
     # ------------------------------------------------------------------
@@ -34,8 +35,8 @@ class TargetsResource:
     def list_mcp_servers(
         self,
         *,
-        page_size: Optional[int] = None,
-        next_cursor: Optional[str] = None,
+        page_size: int | None = None,
+        next_cursor: str | None = None,
     ) -> McpServerListResponse:
         """Return registered MCP servers (cursor-paginated).
 
@@ -60,15 +61,13 @@ class TargetsResource:
     # GET /api/targets/mcp-servers (pagination helper)
     # ------------------------------------------------------------------
 
-    def iter_all_mcp_servers(
-        self, *, page_size: Optional[int] = None
-    ) -> Iterator[McpServerResponse]:
+    def iter_all_mcp_servers(self, *, page_size: int | None = None) -> Iterator[McpServerResponse]:
         """Yield every registered MCP server, transparently paging through results.
 
         Equivalent to repeatedly calling :meth:`list_mcp_servers` and following
         ``next_cursor`` until the server stops returning one.
         """
-        next_cursor: Optional[str] = None
+        next_cursor: str | None = None
         while True:
             page = self.list_mcp_servers(page_size=page_size, next_cursor=next_cursor)
             yield from page.mcp_servers
@@ -82,7 +81,7 @@ class TargetsResource:
 
     def register_mcp_server(
         self,
-        request: Union[RegisterCustomMcpServerRequest, RegisterPredefinedMcpServerRequest],
+        request: RegisterCustomMcpServerRequest | RegisterPredefinedMcpServerRequest,
     ) -> McpServerResponse:
         """Register a custom or predefined MCP server target.
 
@@ -107,18 +106,14 @@ class TargetsResource:
 
     def get_mcp_server(self, server_id: str) -> McpServerResponse:
         """Get details of a registered MCP server."""
-        body = self._t._request(
-            "GET", f"/api/targets/mcp-servers/{server_id}", accept=_ACCEPT
-        )
+        body = self._t._request("GET", f"/api/targets/mcp-servers/{server_id}", accept=_ACCEPT)
         return McpServerResponse.model_validate(body)
 
     # ------------------------------------------------------------------
     # PUT /api/targets/mcp-servers/{Id}
     # ------------------------------------------------------------------
 
-    def edit_mcp_server(
-        self, server_id: str, request: EditMcpServerRequest
-    ) -> McpServerResponse:
+    def edit_mcp_server(self, server_id: str, request: EditMcpServerRequest) -> McpServerResponse:
         """Update MCP server metadata.
 
         Editable fields: ``description``, ``owners``, ``tags``, ``category``
@@ -146,17 +141,13 @@ class TargetsResource:
         :class:`~secai.exceptions.ConflictError` is raised if either rule is
         violated.
         """
-        self._t._request(
-            "DELETE", f"/api/targets/mcp-servers/{server_id}", accept=_ACCEPT
-        )
+        self._t._request("DELETE", f"/api/targets/mcp-servers/{server_id}", accept=_ACCEPT)
 
     # ------------------------------------------------------------------
     # POST /api/targets/mcp-servers/{Id}/state
     # ------------------------------------------------------------------
 
-    def set_mcp_server_state(
-        self, server_id: str, state: McpState | str
-    ) -> McpServerResponse:
+    def set_mcp_server_state(self, server_id: str, state: McpState | str) -> McpServerResponse:
         """Toggle a registered MCP server between ``ENABLED`` and ``DISABLED``.
 
         The state endpoint returns ``{"id": ..., "status": {"state": ...}}``
@@ -179,9 +170,7 @@ class TargetsResource:
 
     def list_predefined_mcp_servers(self) -> PredefinedMcpListResponse:
         """List all predefined MCP server templates from the catalog."""
-        body = self._t._request(
-            "GET", "/api/targets/predefined/mcp-servers", accept=_ACCEPT
-        )
+        body = self._t._request("GET", "/api/targets/predefined/mcp-servers", accept=_ACCEPT)
         return PredefinedMcpListResponse.model_validate(body)
 
     # ------------------------------------------------------------------

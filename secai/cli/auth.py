@@ -38,12 +38,13 @@ deleted) the next time one becomes usable.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import stat
 import sys
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 import httpx
 
@@ -58,7 +59,7 @@ _NOT_LOADED = object()
 _keyring_module_cache: Any = _NOT_LOADED
 
 
-def _import_keyring() -> Optional[Any]:
+def _import_keyring() -> Any | None:
     """Import and return the ``keyring`` module, or None if unavailable.
 
     Honors ``SECAI_NO_KEYRING`` as an explicit opt-out. ``keyring`` is a
@@ -81,7 +82,7 @@ def _import_keyring() -> Optional[Any]:
     return _keyring
 
 
-def _keyring_get_raw() -> Optional[str]:
+def _keyring_get_raw() -> str | None:
     """Best-effort read from the OS keyring. Never raises, never warns."""
     kr = _import_keyring()
     if kr is None:
@@ -208,9 +209,9 @@ def save_credentials(
     tenant_url: str,
     token: str,
     *,
-    identity_url: Optional[str] = None,
-    client_id: Optional[str] = None,
-    client_secret: Optional[str] = None,
+    identity_url: str | None = None,
+    client_id: str | None = None,
+    client_secret: str | None = None,
 ) -> None:
     """Persist credentials, preferring the OS keyring over a plaintext file.
 
@@ -240,7 +241,7 @@ def save_credentials(
     _CREDENTIALS_FILE.chmod(stat.S_IRUSR | stat.S_IWUSR)  # 0600
 
 
-def load_credentials() -> Optional[dict[str, str]]:
+def load_credentials() -> dict[str, str] | None:
     """Load cached credentials, or None if no login has been saved.
 
     Includes ``identity_url``/``client_id``/``client_secret`` when present
@@ -272,10 +273,8 @@ def load_credentials() -> Optional[dict[str, str]]:
         return None
 
     if migrate and _keyring_set_raw(json.dumps(data), warn_on_failure=False):
-        try:
+        with contextlib.suppress(OSError):
             _CREDENTIALS_FILE.unlink()
-        except OSError:
-            pass
 
     result = {"tenant_url": data["tenant_url"], "token": data["token"]}
     for key in ("identity_url", "client_id", "client_secret"):
@@ -296,7 +295,7 @@ def clear_credentials() -> bool:
     return removed
 
 
-def resolve_credentials() -> tuple[Optional[str], Optional[str]]:
+def resolve_credentials() -> tuple[str | None, str | None]:
     """Resolve (tenant_url, token) using env vars first, then the cached login.
 
     Env vars (``SECAI_TENANT_URL``/``SECAI_TOKEN``) always take precedence so
@@ -314,7 +313,7 @@ def resolve_credentials() -> tuple[Optional[str], Optional[str]]:
     return env_url, env_token
 
 
-def build_token_refresher(tenant_url: str) -> Optional[Callable[[], str]]:
+def build_token_refresher(tenant_url: str) -> Callable[[], str] | None:
     """Return a zero-arg callable that mints a fresh token, or None.
 
     Looks for OAuth2 service-account credentials in two places, preferring

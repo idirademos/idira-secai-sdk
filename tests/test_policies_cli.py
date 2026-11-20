@@ -53,12 +53,18 @@ class TestPoliciesCreate:
     def test_create_autonomous_exits_zero(self) -> None:
         name = f"test-secai-sdk-policy-{uuid.uuid4().hex[:6]}"
         result = run_cli(
-            "policies", "create",
-            "--name", name,
-            "--access-type", "AUTONOMOUS",
-            "--description", "CLI test registration",
-            "--resource-match", "mcp:test-secai-sdk:*",
-            "--output", "json",
+            "policies",
+            "create",
+            "--name",
+            name,
+            "--access-type",
+            "AUTONOMOUS",
+            "--description",
+            "CLI test registration",
+            "--resource-match",
+            "mcp:test-secai-sdk:*",
+            "--output",
+            "json",
         )
         assert result.returncode == 0
         data = json.loads(result.stdout)
@@ -70,12 +76,18 @@ class TestPoliciesCreate:
     def test_create_returns_enabled_state_by_default(self) -> None:
         name = f"test-secai-sdk-policy-enabled-{uuid.uuid4().hex[:6]}"
         result = run_cli(
-            "policies", "create",
-            "--name", name,
-            "--access-type", "AUTONOMOUS",
-            "--description", "CLI test suite - enabled state check",
-            "--resource-match", "mcp:test-secai-sdk:*",
-            "--output", "json",
+            "policies",
+            "create",
+            "--name",
+            name,
+            "--access-type",
+            "AUTONOMOUS",
+            "--description",
+            "CLI test suite - enabled state check",
+            "--resource-match",
+            "mcp:test-secai-sdk:*",
+            "--output",
+            "json",
         )
         assert result.returncode == 0
         data = json.loads(result.stdout)
@@ -87,14 +99,22 @@ class TestPoliciesCreate:
     def test_create_with_tags(self) -> None:
         name = f"test-secai-sdk-policy-tagged-{uuid.uuid4().hex[:6]}"
         result = run_cli(
-            "policies", "create",
-            "--name", name,
-            "--access-type", "AUTONOMOUS",
-            "--description", "CLI test suite - tags check",
-            "--resource-match", "mcp:test-secai-sdk:*",
-            "--tag", "env=test",
-            "--tag", "team=sdk",
-            "--output", "json",
+            "policies",
+            "create",
+            "--name",
+            name,
+            "--access-type",
+            "AUTONOMOUS",
+            "--description",
+            "CLI test suite - tags check",
+            "--resource-match",
+            "mcp:test-secai-sdk:*",
+            "--tag",
+            "env=test",
+            "--tag",
+            "team=sdk",
+            "--output",
+            "json",
         )
         assert result.returncode == 0
         data = json.loads(result.stdout)
@@ -108,10 +128,14 @@ class TestPoliciesCreate:
         """ON_BEHALF_OF without --user-role-id must fail client-side validation."""
         name = f"test-secai-sdk-policy-obo-{uuid.uuid4().hex[:6]}"
         result = run_cli(
-            "policies", "create",
-            "--name", name,
-            "--access-type", "ON_BEHALF_OF",
-            "--resource-match", "mcp:test-secai-sdk:*",
+            "policies",
+            "create",
+            "--name",
+            name,
+            "--access-type",
+            "ON_BEHALF_OF",
+            "--resource-match",
+            "mcp:test-secai-sdk:*",
             check=False,
         )
         assert result.returncode != 0
@@ -160,9 +184,13 @@ class TestPoliciesGet:
 class TestPoliciesUpdate:
     def test_update_description(self, live_policy: dict) -> None:
         result = run_cli(
-            "policies", "update", live_policy["id"],
-            "--description", "Updated by test suite",
-            "--output", "json",
+            "policies",
+            "update",
+            live_policy["id"],
+            "--description",
+            "Updated by test suite",
+            "--output",
+            "json",
         )
         assert result.returncode == 0
         data = json.loads(result.stdout)
@@ -170,10 +198,15 @@ class TestPoliciesUpdate:
 
     def test_update_tags(self, live_policy: dict) -> None:
         result = run_cli(
-            "policies", "update", live_policy["id"],
-            "--tag", "env=test",
-            "--tag", "suite=policies",
-            "--output", "json",
+            "policies",
+            "update",
+            live_policy["id"],
+            "--tag",
+            "env=test",
+            "--tag",
+            "suite=policies",
+            "--output",
+            "json",
         )
         assert result.returncode == 0
         data = json.loads(result.stdout)
@@ -182,9 +215,13 @@ class TestPoliciesUpdate:
 
     def test_update_resource_match(self, live_policy: dict) -> None:
         result = run_cli(
-            "policies", "update", live_policy["id"],
-            "--resource-match", "mcp:test-secai-sdk-updated:*",
-            "--output", "json",
+            "policies",
+            "update",
+            live_policy["id"],
+            "--resource-match",
+            "mcp:test-secai-sdk-updated:*",
+            "--output",
+            "json",
         )
         assert result.returncode == 0
         data = json.loads(result.stdout)
@@ -199,8 +236,12 @@ class TestPoliciesUpdate:
 class TestPoliciesSetState:
     def test_set_state_disabled(self, live_policy: dict) -> None:
         result = run_cli(
-            "policies", "set-state", live_policy["id"], "DISABLED",
-            "--output", "json",
+            "policies",
+            "set-state",
+            live_policy["id"],
+            "DISABLED",
+            "--output",
+            "json",
         )
         assert result.returncode == 0
         data = json.loads(result.stdout)
@@ -208,8 +249,12 @@ class TestPoliciesSetState:
 
     def test_set_state_enabled(self, live_policy: dict) -> None:
         result = run_cli(
-            "policies", "set-state", live_policy["id"], "ENABLED",
-            "--output", "json",
+            "policies",
+            "set-state",
+            live_policy["id"],
+            "ENABLED",
+            "--output",
+            "json",
         )
         assert result.returncode == 0
         data = json.loads(result.stdout)
@@ -230,12 +275,18 @@ class TestPoliciesDelete:
         """Full lifecycle: create → disable → delete."""
         name = f"test-secai-sdk-del-policy-{uuid.uuid4().hex[:6]}"
         reg = run_cli(
-            "policies", "create",
-            "--name", name,
-            "--access-type", "AUTONOMOUS",
-            "--description", "CLI test suite - delete lifecycle",
-            "--resource-match", "mcp:test-secai-sdk:*",
-            "--output", "json",
+            "policies",
+            "create",
+            "--name",
+            name,
+            "--access-type",
+            "AUTONOMOUS",
+            "--description",
+            "CLI test suite - delete lifecycle",
+            "--resource-match",
+            "mcp:test-secai-sdk:*",
+            "--output",
+            "json",
         )
         policy_id = json.loads(reg.stdout)["id"]
 

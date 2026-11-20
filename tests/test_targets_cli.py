@@ -17,7 +17,6 @@ import pytest
 
 from .conftest import run_cli
 
-
 # ---------------------------------------------------------------------------
 # List MCP servers
 # ---------------------------------------------------------------------------
@@ -56,14 +55,22 @@ class TestTargetsRegister:
     def test_register_custom_exits_zero(self) -> None:
         name = f"test-secai-sdk-mcp-{uuid.uuid4().hex[:6]}"
         result = run_cli(
-            "targets", "register",
-            "--source", "CUSTOM",
-            "--name", name,
-            "--description", "CLI test registration",
-            "--category", "WEB_AND_BROWSER_AUTOMATION",
-            "--url", "https://mcp.context7.com/mcp",
-            "--auth-type", "NONE",
-            "--output", "json",
+            "targets",
+            "register",
+            "--source",
+            "CUSTOM",
+            "--name",
+            name,
+            "--description",
+            "CLI test registration",
+            "--category",
+            "WEB_AND_BROWSER_AUTOMATION",
+            "--url",
+            "https://mcp.context7.com/mcp",
+            "--auth-type",
+            "NONE",
+            "--output",
+            "json",
         )
         assert result.returncode == 0
         data = json.loads(result.stdout)
@@ -75,14 +82,22 @@ class TestTargetsRegister:
     def test_register_returns_enabled_state(self) -> None:
         name = f"test-secai-sdk-mcp-enabled-{uuid.uuid4().hex[:6]}"
         result = run_cli(
-            "targets", "register",
-            "--source", "CUSTOM",
-            "--name", name,
-            "--description", "CLI test suite - enabled state check",
-            "--category", "ITSM_AND_INCIDENT_RESPONSE",
-            "--url", "https://mcp.context7.com/mcp",
-            "--auth-type", "NONE",
-            "--output", "json",
+            "targets",
+            "register",
+            "--source",
+            "CUSTOM",
+            "--name",
+            name,
+            "--description",
+            "CLI test suite - enabled state check",
+            "--category",
+            "ITSM_AND_INCIDENT_RESPONSE",
+            "--url",
+            "https://mcp.context7.com/mcp",
+            "--auth-type",
+            "NONE",
+            "--output",
+            "json",
         )
         assert result.returncode == 0
         data = json.loads(result.stdout)
@@ -94,16 +109,26 @@ class TestTargetsRegister:
     def test_register_with_tags(self) -> None:
         name = f"test-secai-sdk-mcp-tagged-{uuid.uuid4().hex[:6]}"
         result = run_cli(
-            "targets", "register",
-            "--source", "CUSTOM",
-            "--name", name,
-            "--description", "CLI test suite - tags check",
-            "--category", "COMMUNICATION_AND_TEAM_CHAT",
-            "--url", "https://mcp.context7.com/mcp",
-            "--auth-type", "NONE",
-            "--tag", "env=test",
-            "--tag", "team=sdk",
-            "--output", "json",
+            "targets",
+            "register",
+            "--source",
+            "CUSTOM",
+            "--name",
+            name,
+            "--description",
+            "CLI test suite - tags check",
+            "--category",
+            "COMMUNICATION_AND_TEAM_CHAT",
+            "--url",
+            "https://mcp.context7.com/mcp",
+            "--auth-type",
+            "NONE",
+            "--tag",
+            "env=test",
+            "--tag",
+            "team=sdk",
+            "--output",
+            "json",
         )
         assert result.returncode == 0
         data = json.loads(result.stdout)
@@ -115,17 +140,28 @@ class TestTargetsRegister:
 
     def test_register_duplicate_name_returns_409(self, live_mcp_server: dict) -> None:
         result = run_cli(
-            "targets", "register",
-            "--source", "CUSTOM",
-            "--name", live_mcp_server["name"],
-            "--description", "CLI test suite - duplicate name check",
-            "--category", "DEVELOPER_TOOLS_AND_SOURCE_CONTROL",
-            "--url", "https://mcp.context7.com/mcp",
-            "--auth-type", "NONE",
+            "targets",
+            "register",
+            "--source",
+            "CUSTOM",
+            "--name",
+            live_mcp_server["name"],
+            "--description",
+            "CLI test suite - duplicate name check",
+            "--category",
+            "DEVELOPER_TOOLS_AND_SOURCE_CONTROL",
+            "--url",
+            "https://mcp.context7.com/mcp",
+            "--auth-type",
+            "NONE",
             check=False,
         )
         assert result.returncode != 0
-        assert "409" in result.stderr or "conflict" in result.stderr.lower() or "exists" in result.stderr.lower()
+        assert (
+            "409" in result.stderr
+            or "conflict" in result.stderr.lower()
+            or "exists" in result.stderr.lower()
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -167,9 +203,13 @@ class TestTargetsGet:
 class TestTargetsEdit:
     def test_edit_description(self, live_mcp_server: dict) -> None:
         result = run_cli(
-            "targets", "edit", live_mcp_server["id"],
-            "--description", "Updated by test suite",
-            "--output", "json",
+            "targets",
+            "edit",
+            live_mcp_server["id"],
+            "--description",
+            "Updated by test suite",
+            "--output",
+            "json",
         )
         assert result.returncode == 0
         data = json.loads(result.stdout)
@@ -177,10 +217,15 @@ class TestTargetsEdit:
 
     def test_edit_tags(self, live_mcp_server: dict) -> None:
         result = run_cli(
-            "targets", "edit", live_mcp_server["id"],
-            "--tag", "env=test",
-            "--tag", "suite=targets",
-            "--output", "json",
+            "targets",
+            "edit",
+            live_mcp_server["id"],
+            "--tag",
+            "env=test",
+            "--tag",
+            "suite=targets",
+            "--output",
+            "json",
         )
         assert result.returncode == 0
         data = json.loads(result.stdout)
@@ -189,9 +234,12 @@ class TestTargetsEdit:
 
     def test_edit_immutable_name_returns_error(self, live_mcp_server: dict) -> None:
         """The API must reject attempts to change the server name."""
-        result = run_cli(
-            "targets", "edit", live_mcp_server["id"],
-            "--output", "json",
+        run_cli(
+            "targets",
+            "edit",
+            live_mcp_server["id"],
+            "--output",
+            "json",
             check=False,
         )
         # An edit with no payload is a no-op but should still succeed
@@ -208,8 +256,12 @@ class TestTargetsEdit:
 class TestTargetsSetState:
     def test_set_state_disabled(self, live_mcp_server: dict) -> None:
         result = run_cli(
-            "targets", "set-state", live_mcp_server["id"], "DISABLED",
-            "--output", "json",
+            "targets",
+            "set-state",
+            live_mcp_server["id"],
+            "DISABLED",
+            "--output",
+            "json",
         )
         assert result.returncode == 0
         data = json.loads(result.stdout)
@@ -217,8 +269,12 @@ class TestTargetsSetState:
 
     def test_set_state_enabled(self, live_mcp_server: dict) -> None:
         result = run_cli(
-            "targets", "set-state", live_mcp_server["id"], "ENABLED",
-            "--output", "json",
+            "targets",
+            "set-state",
+            live_mcp_server["id"],
+            "ENABLED",
+            "--output",
+            "json",
         )
         assert result.returncode == 0
         data = json.loads(result.stdout)
@@ -239,14 +295,22 @@ class TestTargetsDelete:
         """Full lifecycle: register → disable → delete."""
         name = f"test-secai-sdk-del-tgt-{uuid.uuid4().hex[:6]}"
         reg = run_cli(
-            "targets", "register",
-            "--source", "CUSTOM",
-            "--name", name,
-            "--description", "CLI test suite - delete lifecycle",
-            "--category", "WEB_AND_BROWSER_AUTOMATION",
-            "--url", "https://mcp.context7.com/mcp",
-            "--auth-type", "NONE",
-            "--output", "json",
+            "targets",
+            "register",
+            "--source",
+            "CUSTOM",
+            "--name",
+            name,
+            "--description",
+            "CLI test suite - delete lifecycle",
+            "--category",
+            "WEB_AND_BROWSER_AUTOMATION",
+            "--url",
+            "https://mcp.context7.com/mcp",
+            "--auth-type",
+            "NONE",
+            "--output",
+            "json",
         )
         server_id = json.loads(reg.stdout)["id"]
 
@@ -302,7 +366,8 @@ class TestPredefinedTargets:
 
     def test_get_predefined_nonexistent_returns_404(self) -> None:
         result = run_cli(
-            "targets", "get-predefined",
+            "targets",
+            "get-predefined",
             "00000000-0000-0000-0000-000000000000",
             check=False,
         )
@@ -320,11 +385,16 @@ class TestPredefinedTargets:
         predefined_id = targets[0]["id"]
         name = f"test-secai-sdk-predef-{uuid.uuid4().hex[:6]}"
         result = run_cli(
-            "targets", "register",
-            "--source", "PREDEFINED",
-            "--predefined-id", predefined_id,
-            "--name", name,
-            "--output", "json",
+            "targets",
+            "register",
+            "--source",
+            "PREDEFINED",
+            "--predefined-id",
+            predefined_id,
+            "--name",
+            name,
+            "--output",
+            "json",
         )
         assert result.returncode == 0
         server_data = json.loads(result.stdout)

@@ -14,7 +14,7 @@ from __future__ import annotations
 import os
 import subprocess
 import uuid
-from typing import Generator
+from collections.abc import Generator
 
 import pytest
 
@@ -41,9 +41,7 @@ def run_cli(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
     )
     if check and result.returncode != 0:
         raise AssertionError(
-            f"CLI exited {result.returncode}\n"
-            f"stdout: {result.stdout}\n"
-            f"stderr: {result.stderr}"
+            f"CLI exited {result.returncode}\nstdout: {result.stdout}\nstderr: {result.stderr}"
         )
     return result
 
@@ -58,15 +56,23 @@ def live_agent() -> Generator[dict[str, str], None, None]:
     """Register a test agent; yield its id; delete it after the session."""
     name = _unique("agent")
     result = run_cli(
-        "agents", "register",
-        "--name", name,
-        "--type", "COPILOT",
-        "--description", "Created by secai-sdk test suite",
-        "--owner", "SDK Tests",
-        "--tag", "env=test",
-        "--output", "json",
+        "agents",
+        "register",
+        "--name",
+        name,
+        "--type",
+        "COPILOT",
+        "--description",
+        "Created by secai-sdk test suite",
+        "--owner",
+        "SDK Tests",
+        "--tag",
+        "env=test",
+        "--output",
+        "json",
     )
     import json
+
     data = json.loads(result.stdout)
     agent_id: str = data["id"]
     yield {
@@ -93,17 +99,27 @@ def live_mcp_server() -> Generator[dict[str, str], None, None]:
     """Register a test custom MCP server; yield its id; disable and delete after session."""
     name = _unique("mcp")
     result = run_cli(
-        "targets", "register",
-        "--source", "CUSTOM",
-        "--name", name,
-        "--description", "Created by secai-sdk test suite",
-        "--category", "DEVELOPER_TOOLS_AND_SOURCE_CONTROL",
-        "--url", "https://mcp.context7.com/mcp",
-        "--auth-type", "NONE",
-        "--tag", "env=test",
-        "--output", "json",
+        "targets",
+        "register",
+        "--source",
+        "CUSTOM",
+        "--name",
+        name,
+        "--description",
+        "Created by secai-sdk test suite",
+        "--category",
+        "DEVELOPER_TOOLS_AND_SOURCE_CONTROL",
+        "--url",
+        "https://mcp.context7.com/mcp",
+        "--auth-type",
+        "NONE",
+        "--tag",
+        "env=test",
+        "--output",
+        "json",
     )
     import json
+
     data = json.loads(result.stdout)
     server_id: str = data["id"]
     yield {"id": server_id, "name": name}
@@ -125,15 +141,23 @@ def live_policy() -> Generator[dict[str, str], None, None]:
     """Create a test access policy; yield its id; disable and delete after session."""
     name = _unique("policy")
     result = run_cli(
-        "policies", "create",
-        "--name", name,
-        "--access-type", "AUTONOMOUS",
-        "--description", "Created by secai-sdk test suite",
-        "--resource-match", "mcp:test-secai-sdk:*",
-        "--tag", "env=test",
-        "--output", "json",
+        "policies",
+        "create",
+        "--name",
+        name,
+        "--access-type",
+        "AUTONOMOUS",
+        "--description",
+        "Created by secai-sdk test suite",
+        "--resource-match",
+        "mcp:test-secai-sdk:*",
+        "--tag",
+        "env=test",
+        "--output",
+        "json",
     )
     import json
+
     data = json.loads(result.stdout)
     policy_id: str = data["id"]
     yield {"id": policy_id, "name": name}

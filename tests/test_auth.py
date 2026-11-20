@@ -12,7 +12,7 @@ import json
 import stat
 import sys
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import pytest
 from pytest_httpx import HTTPXMock
@@ -134,7 +134,7 @@ class _FakeKeyringModule:
         self.backend_name = backend_name
         self.store: dict[tuple[str, str], str] = {}
 
-    def get_password(self, service: str, username: str) -> Optional[str]:
+    def get_password(self, service: str, username: str) -> str | None:
         if not self.usable:
             raise RuntimeError("fake: no keyring backend available")
         return self.store.get((service, username))

@@ -17,6 +17,36 @@ may include breaking changes.
 5. Commit `pyproject.toml`, `uv.lock`, and `CHANGELOG.md` together, then tag the release
    (e.g. `git tag v0.3.0 && git push --tags`).
 
+## 0.2.1
+
+- **Lint/type debt cleanup**: resolved all 385 pre-existing `ruff` findings (full rule set
+  `E,F,I,UP,B,SIM`) and all 54 pre-existing `mypy --strict` errors that CI had been surfacing
+  but not enforcing (see 0.2.0's CI workflow). No CLI/API behavior changes — this was internal
+  code quality work:
+  - Mechanically rewrote all `Optional[X]`/`Union[X, Y]` annotations to `X | None`/`X | Y`
+    (272 + 2 occurrences).
+  - Reflowed long `--help` strings and f-strings in the CLI modules to fit the 100-char limit.
+  - Added `[tool.ruff.lint.flake8-bugbear] extend-immutable-calls = ["typer.Option",
+    "typer.Argument"]` so Typer's required `param: T = typer.Option(...)` pattern no longer
+    trips the `B008` mutable-default-argument check (ruff's own documented fix for this exact
+    FastAPI/Typer pattern).
+  - Fixed a `mypy`/pydantic interaction quirk where `Field(None, alias=...)` (positional
+    default) was read as a *required* constructor argument by mypy's `dataclass_transform`
+    inference, even though the field has a default; switched all 65 occurrences in
+    `secai/models.py` to `Field(default=None, alias=...)`, which mypy infers correctly.
+  - Added `assert ... is not None` right after the CLI's existing `_help_if_missing()` calls so
+    mypy can see what was already true at runtime: once that check passes, the corresponding
+    CLI arguments are guaranteed non-`None`.
+  - Fixed two latent cosmetic-only type mismatches that happened to be runtime-safe already
+    (via Pydantic's `populate_by_name`/string-enum coercion), now using the canonical
+    alias/enum forms: `SearchAgentsRequest(pageSize=..., continuationToken=...)` instead of the
+    snake_case kwargs, and `Condition(op=ConditionOp.IN)` instead of the raw string `"in"`.
+  - Bumped `[tool.mypy] python_version` from the no-longer-supported `"3.9"` to `"3.10"`,
+    matching the Python versions CI actually tests against.
+- **CI tightened** (`.github/workflows/ci.yml`): `ruff check` now runs with the full configured
+  rule set (no `--select`/`--extend-exclude` overrides) across all files, and the `mypy` job
+  is blocking (`continue-on-error` removed) instead of informational.
+
 ## 0.2.0
 
 **Breaking changes** — the SDK was rewritten to match a new version of the

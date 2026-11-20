@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import os
 import sys
-from typing import Optional
 
 import typer
 from rich.console import Console
@@ -16,6 +15,7 @@ from ..exceptions import SecAIError
 from ..models import (
     Condition,
     ConditionGroup,
+    ConditionOp,
     Owner,
     OwnerType,
     PolicyAccessType,
@@ -67,15 +67,15 @@ def _parse_owners(owner_ids: list[str]) -> list[Owner]:
 
 
 def _in_group(key: str, values: list[str]) -> ConditionGroup:
-    return ConditionGroup(conditions=[Condition(op="in", key=key, value=list(values))])
+    return ConditionGroup(conditions=[Condition(op=ConditionOp.IN, key=key, value=list(values))])
 
 
 def _match_group(key: str, value: str) -> ConditionGroup:
-    return ConditionGroup(conditions=[Condition(op="match", key=key, value=value)])
+    return ConditionGroup(conditions=[Condition(op=ConditionOp.MATCH, key=key, value=value)])
 
 
 def _any_group() -> ConditionGroup:
-    return ConditionGroup(conditions=[Condition(op="any")])
+    return ConditionGroup(conditions=[Condition(op=ConditionOp.ANY)])
 
 
 _POSITIONAL_ARGS = {"policy_id"}
@@ -104,9 +104,13 @@ def _help_if_missing(ctx: typer.Context, **named_values: object) -> None:
 
 @policies_app.command("list")
 def policies_list(
-    page_size: Optional[int] = typer.Option(None, "--page-size", help="Max policies per page (default 50)."),
-    cursor: Optional[str] = typer.Option(None, "--cursor", help="Pagination cursor from a previous response."),
-    output: Optional[str] = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
+    page_size: int | None = typer.Option(
+        None, "--page-size", help="Max policies per page (default 50)."
+    ),
+    cursor: str | None = typer.Option(
+        None, "--cursor", help="Pagination cursor from a previous response."
+    ),
+    output: str | None = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
 ) -> None:
     """List access policies in the tenant."""
     fmt = (output or _fmt()).lower()
@@ -126,6 +130,7 @@ def policies_list(
 
     if fmt == "json":
         from rich import print_json
+
         print_json(json.dumps(resp.model_dump(by_alias=True), default=str))
         return
 
@@ -158,21 +163,34 @@ def policies_list(
 @policies_app.command("create")
 def policies_create(
     ctx: typer.Context,
-    name: Optional[str] = typer.Option(None, "--name", "-n", help="Policy name. [required]"),
-    access_type: Optional[PolicyAccessType] = typer.Option(
+    name: str | None = typer.Option(None, "--name", "-n", help="Policy name. [required]"),
+    access_type: PolicyAccessType | None = typer.Option(
         None, "--access-type", help="ON_BEHALF_OF or AUTONOMOUS. [required]"
     ),
-    description: Optional[str] = typer.Option(None, "--description", "-d"),
+    description: str | None = typer.Option(None, "--description", "-d"),
     state: PolicyState = typer.Option(PolicyState.ENABLED, "--state", help="ENABLED or DISABLED."),
-    agent_id: Optional[list[str]] = typer.Option(None, "--agent-id", help="Agent ID to grant (repeatable; 'any' group used if omitted)."),
-    user_role_id: Optional[list[str]] = typer.Option(None, "--user-role-id", help="User roleId to grant (required for ON_BEHALF_OF; repeatable)."),
-    resource_match: Optional[list[str]] = typer.Option(None, "--resource-match", help="Resource glob match, e.g. 'mcp:reporting:*' (repeatable). [required]"),
-    tag: Optional[list[str]] = typer.Option(None, "--tag", help="TAG=VALUE (repeatable)."),
-    owner_id: Optional[list[str]] = typer.Option(None, "--owner-id", help="Owner user ID (repeatable)."),
-    output: Optional[str] = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
+    agent_id: list[str] | None = typer.Option(
+        None, "--agent-id", help="Agent ID to grant (repeatable; 'any' group used if omitted)."
+    ),
+    user_role_id: list[str] | None = typer.Option(
+        None, "--user-role-id", help="User roleId to grant (required for ON_BEHALF_OF; repeatable)."
+    ),
+    resource_match: list[str] | None = typer.Option(
+        None,
+        "--resource-match",
+        help="Resource glob match, e.g. 'mcp:reporting:*' (repeatable). [required]",
+    ),
+    tag: list[str] | None = typer.Option(None, "--tag", help="TAG=VALUE (repeatable)."),
+    owner_id: list[str] | None = typer.Option(
+        None, "--owner-id", help="Owner user ID (repeatable)."
+    ),
+    output: str | None = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
 ) -> None:
     """Create an access policy controlling which users/agents can run tools on MCP servers."""
     _help_if_missing(ctx, name=name, access_type=access_type, resource_match=resource_match)
+    assert name is not None
+    assert access_type is not None
+    assert resource_match is not None
     fmt = (output or _fmt()).lower()
 
     agent_groups = [_in_group("id", agent_id)] if agent_id else [_any_group()]
@@ -193,7 +211,7 @@ def policies_create(
         )
     except ValueError as exc:
         err_console.print(f"[bold red]Invalid policy:[/bold red] {exc}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from exc
 
     try:
         with _client() as client:
@@ -208,6 +226,7 @@ def policies_create(
 
     if fmt == "json":
         from rich import print_json
+
         print_json(json.dumps(policy.model_dump(by_alias=True), default=str))
         return
 
@@ -225,19 +244,34 @@ def policies_create(
 @policies_app.command("update")
 def policies_update(
     ctx: typer.Context,
-    policy_id: Optional[str] = typer.Argument(None, help="Policy UUID. [required]"),
-    name: Optional[str] = typer.Option(None, "--name", "-n"),
-    description: Optional[str] = typer.Option(None, "--description", "-d"),
-    state: Optional[PolicyState] = typer.Option(None, "--state"),
-    agent_id: Optional[list[str]] = typer.Option(None, "--agent-id", help="Replace agent grant with these IDs (repeatable)."),
-    user_role_id: Optional[list[str]] = typer.Option(None, "--user-role-id", help="Replace user grant with these roleIds (repeatable; ON_BEHALF_OF only)."),
-    resource_match: Optional[list[str]] = typer.Option(None, "--resource-match", help="Replace resource grants with these glob matches (repeatable)."),
-    tag: Optional[list[str]] = typer.Option(None, "--tag", help="TAG=VALUE (repeatable). Replaces all tags."),
-    owner_id: Optional[list[str]] = typer.Option(None, "--owner-id", help="Owner user ID (repeatable). Replaces all owners."),
-    output: Optional[str] = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
+    policy_id: str | None = typer.Argument(None, help="Policy UUID. [required]"),
+    name: str | None = typer.Option(None, "--name", "-n"),
+    description: str | None = typer.Option(None, "--description", "-d"),
+    state: PolicyState | None = typer.Option(None, "--state"),
+    agent_id: list[str] | None = typer.Option(
+        None, "--agent-id", help="Replace agent grant with these IDs (repeatable)."
+    ),
+    user_role_id: list[str] | None = typer.Option(
+        None,
+        "--user-role-id",
+        help="Replace user grant with these roleIds (repeatable; ON_BEHALF_OF only).",
+    ),
+    resource_match: list[str] | None = typer.Option(
+        None,
+        "--resource-match",
+        help="Replace resource grants with these glob matches (repeatable).",
+    ),
+    tag: list[str] | None = typer.Option(
+        None, "--tag", help="TAG=VALUE (repeatable). Replaces all tags."
+    ),
+    owner_id: list[str] | None = typer.Option(
+        None, "--owner-id", help="Owner user ID (repeatable). Replaces all owners."
+    ),
+    output: str | None = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
 ) -> None:
     """Update an access policy. All options are optional; omitted fields are left unchanged."""
     _help_if_missing(ctx, policy_id=policy_id)
+    assert policy_id is not None
     fmt = (output or _fmt()).lower()
 
     req = PolicyUpdate(
@@ -262,6 +296,7 @@ def policies_update(
         return
 
     from rich import print_json
+
     print_json(json.dumps(policy.model_dump(by_alias=True), default=str))
 
 
@@ -273,11 +308,12 @@ def policies_update(
 @policies_app.command("get")
 def policies_get(
     ctx: typer.Context,
-    policy_id: Optional[str] = typer.Argument(None, help="Policy UUID. [required]"),
-    output: Optional[str] = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
+    policy_id: str | None = typer.Argument(None, help="Policy UUID. [required]"),
+    output: str | None = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
 ) -> None:
     """Get full details for a single access policy."""
     _help_if_missing(ctx, policy_id=policy_id)
+    assert policy_id is not None
     fmt = (output or _fmt()).lower()
     try:
         with _client() as client:
@@ -291,6 +327,7 @@ def policies_get(
         return
 
     from rich import print_json
+
     print_json(json.dumps(policy.model_dump(by_alias=True), default=str))
 
 
@@ -302,11 +339,12 @@ def policies_get(
 @policies_app.command("delete")
 def policies_delete(
     ctx: typer.Context,
-    policy_id: Optional[str] = typer.Argument(None, help="Policy UUID. [required]"),
+    policy_id: str | None = typer.Argument(None, help="Policy UUID. [required]"),
     confirm: bool = typer.Option(False, "--confirm", help="Required to proceed with deletion."),
 ) -> None:
     """Delete an access policy (must be DISABLED first)."""
     _help_if_missing(ctx, policy_id=policy_id)
+    assert policy_id is not None
     if not confirm:
         err_console.print("[yellow]Pass --confirm to proceed with deletion.[/yellow]")
         raise typer.Exit(1)
@@ -327,12 +365,16 @@ def policies_delete(
 @policies_app.command("set-state")
 def policies_set_state(
     ctx: typer.Context,
-    policy_id: Optional[str] = typer.Argument(None, help="Policy UUID. [required]"),
-    state: Optional[PolicyState] = typer.Argument(None, help="Target state: ENABLED or DISABLED. [required]"),
-    output: Optional[str] = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
+    policy_id: str | None = typer.Argument(None, help="Policy UUID. [required]"),
+    state: PolicyState | None = typer.Argument(
+        None, help="Target state: ENABLED or DISABLED. [required]"
+    ),
+    output: str | None = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
 ) -> None:
     """Enable or disable an access policy."""
     _help_if_missing(ctx, policy_id=policy_id, state=state)
+    assert policy_id is not None
+    assert state is not None
     fmt = (output or _fmt()).lower()
     try:
         with _client() as client:
@@ -347,7 +389,11 @@ def policies_set_state(
 
     if fmt == "json":
         from rich import print_json
+
         print_json(json.dumps(result.model_dump(by_alias=True), default=str))
         return
 
-    console.print(f"[bold green]State updated:[/bold green] {result.id}  →  {result.state.value if result.state else state.value}")
+    console.print(
+        f"[bold green]State updated:[/bold green] {result.id}  →  "
+        f"{result.state.value if result.state else state.value}"
+    )

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional, Union
+from typing import Any, Union
 
 from pydantic import AliasChoices, BaseModel, Field, field_validator, model_validator
 
@@ -91,15 +91,15 @@ class Owner(BaseModel):
     id: str
     name: str
     type: OwnerType = OwnerType.USER
-    source_directory_name: Optional[str] = Field(None, alias="sourceDirectoryName")
-    source_directory_id: Optional[str] = Field(None, alias="sourceDirectoryId")
+    source_directory_name: str | None = Field(default=None, alias="sourceDirectoryName")
+    source_directory_id: str | None = Field(default=None, alias="sourceDirectoryId")
 
     model_config = {"populate_by_name": True}
 
 
 class AgentStatus(BaseModel):
     state: AgentState
-    message: Optional[str] = None
+    message: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -111,11 +111,11 @@ class AuthnDescriptorInput(BaseModel):
     """An authentication descriptor sent on register/edit agent requests."""
 
     type: AuthnDescriptorType
-    sub_type: Optional[str] = Field(None, alias="subType")
-    id: Optional[str] = None
-    service_id: Optional[str] = Field(None, alias="serviceId")
-    client_id: Optional[str] = Field(None, alias="clientId")
-    data: Optional[dict[str, Any]] = None
+    sub_type: str | None = Field(default=None, alias="subType")
+    id: str | None = None
+    service_id: str | None = Field(default=None, alias="serviceId")
+    client_id: str | None = Field(default=None, alias="clientId")
+    data: dict[str, Any] | None = None
 
     model_config = {"populate_by_name": True}
 
@@ -123,13 +123,13 @@ class AuthnDescriptorInput(BaseModel):
 class AuthnDescriptorEntry(BaseModel):
     """An authentication descriptor as nested on an ``Agent`` response."""
 
-    type: Optional[str] = None
-    sub_type: Optional[str] = Field(None, alias="subType")
-    id: Optional[str] = None
-    service_id: Optional[str] = Field(None, alias="serviceId")
-    data: Optional[dict[str, Any]] = None
-    client_id: Optional[str] = Field(None, alias="clientId")
-    client_secret: Optional[str] = Field(None, alias="clientSecret")
+    type: str | None = None
+    sub_type: str | None = Field(default=None, alias="subType")
+    id: str | None = None
+    service_id: str | None = Field(default=None, alias="serviceId")
+    data: dict[str, Any] | None = None
+    client_id: str | None = Field(default=None, alias="clientId")
+    client_secret: str | None = Field(default=None, alias="clientSecret")
 
     model_config = {"populate_by_name": True}
 
@@ -157,12 +157,12 @@ class RegisterAgentRequest(BaseModel):
         alias="redirectCallbackUrls",
         max_length=10,
     )
-    description: Optional[str] = Field(None, max_length=500)
-    owner: Optional[str] = Field(None, min_length=2)
+    description: str | None = Field(None, max_length=500)
+    owner: str | None = Field(None, min_length=2)
     owners: list[Owner] = Field(default_factory=list)
     tags: dict[str, str] = Field(default_factory=dict, max_length=10)
-    agent_subtype: Optional[str] = Field(None, alias="agentSubtype")
-    origin_id: Optional[str] = Field(None, alias="originId")
+    agent_subtype: str | None = Field(default=None, alias="agentSubtype")
+    origin_id: str | None = Field(default=None, alias="originId")
     authn_descriptors: list[AuthnDescriptorInput] = Field(
         default_factory=list, alias="authnDescriptors"
     )
@@ -179,47 +179,47 @@ class RegisterAgentRequest(BaseModel):
 
 
 class EditAgentRequest(BaseModel):
-    name: Optional[str] = Field(None, min_length=2, max_length=256, pattern=r"^[A-Za-z0-9 _-]+$")
-    type: Optional[str] = None
-    description: Optional[str] = Field(None, max_length=500)
-    owner: Optional[str] = Field(None, min_length=2)
-    owners: Optional[list[Owner]] = None
-    redirect_callback_urls: Optional[list[str]] = Field(None, alias="redirectCallbackUrls")
-    tags: Optional[dict[str, str]] = None
-    origin_id: Optional[str] = Field(None, alias="originId")
-    authn_descriptors: Optional[list[AuthnDescriptorInput]] = Field(
-        None, alias="authnDescriptors"
+    name: str | None = Field(None, min_length=2, max_length=256, pattern=r"^[A-Za-z0-9 _-]+$")
+    type: str | None = None
+    description: str | None = Field(None, max_length=500)
+    owner: str | None = Field(None, min_length=2)
+    owners: list[Owner] | None = None
+    redirect_callback_urls: list[str] | None = Field(default=None, alias="redirectCallbackUrls")
+    tags: dict[str, str] | None = None
+    origin_id: str | None = Field(default=None, alias="originId")
+    authn_descriptors: list[AuthnDescriptorInput] | None = Field(
+        default=None, alias="authnDescriptors"
     )
 
     model_config = {"populate_by_name": True}
 
 
 class AgentCredentials(BaseModel):
-    client_id: Optional[str] = Field(None, alias="clientId")
-    client_secret: Optional[str] = Field(None, alias="clientSecret")
-    gateway_url: Optional[str] = Field(None, alias="gatewayUrl")
+    client_id: str | None = Field(default=None, alias="clientId")
+    client_secret: str | None = Field(default=None, alias="clientSecret")
+    gateway_url: str | None = Field(default=None, alias="gatewayUrl")
 
     model_config = {"populate_by_name": True}
 
 
 class Agent(BaseModel):
-    id: Optional[str] = None
-    name: Optional[str] = None
-    type: Optional[str] = None
-    description: Optional[str] = None
-    owner: Optional[str] = None
+    id: str | None = None
+    name: str | None = None
+    type: str | None = None
+    description: str | None = None
+    owner: str | None = None
     owners: list[Owner] = Field(default_factory=list)
     redirect_callback_urls: list[str] = Field(default_factory=list, alias="redirectCallbackUrls")
     tags: dict[str, str] = Field(default_factory=dict)
-    client_id: Optional[str] = Field(None, alias="clientId")
-    status: Optional[AgentStatus] = None
-    created_at: Optional[datetime] = Field(None, alias="createdAt")
-    updated_at: Optional[datetime] = Field(None, alias="updatedAt")
-    created_by: Optional[str] = Field(None, alias="createdBy")
-    updated_by: Optional[str] = Field(None, alias="updatedBy")
-    agent_subtype: Optional[str] = Field(None, alias="agentSubtype")
-    origin_id: Optional[str] = Field(None, alias="originId")
-    last_used: Optional[datetime] = Field(None, alias="lastUsed")
+    client_id: str | None = Field(default=None, alias="clientId")
+    status: AgentStatus | None = None
+    created_at: datetime | None = Field(default=None, alias="createdAt")
+    updated_at: datetime | None = Field(default=None, alias="updatedAt")
+    created_by: str | None = Field(default=None, alias="createdBy")
+    updated_by: str | None = Field(default=None, alias="updatedBy")
+    agent_subtype: str | None = Field(default=None, alias="agentSubtype")
+    origin_id: str | None = Field(default=None, alias="originId")
+    last_used: datetime | None = Field(default=None, alias="lastUsed")
     authn_descriptors: list[AuthnDescriptorEntry] = Field(
         default_factory=list, alias="authnDescriptors"
     )
@@ -238,7 +238,7 @@ class Agent(BaseModel):
 
 
 class AgentWithCredentials(Agent):
-    credentials: Optional[AgentCredentials] = None
+    credentials: AgentCredentials | None = None
 
 
 class AgentStateRequest(BaseModel):
@@ -246,23 +246,23 @@ class AgentStateRequest(BaseModel):
 
 
 class AgentStateResponse(BaseModel):
-    id: Optional[str] = None
-    status: Optional[AgentStatus] = None
+    id: str | None = None
+    status: AgentStatus | None = None
 
 
 class PageInfo(BaseModel):
     """Cursor-based pagination details returned alongside a list of agents."""
 
-    page_size: Optional[int] = Field(None, alias="pageSize")
-    continuation_token: Optional[str] = Field(None, alias="continuationToken")
+    page_size: int | None = Field(default=None, alias="pageSize")
+    continuation_token: str | None = Field(default=None, alias="continuationToken")
 
     model_config = {"populate_by_name": True}
 
 
 class ListAgentsResponse(BaseModel):
     agents: list[Agent] = Field(default_factory=list)
-    page_info: Optional[PageInfo] = Field(None, alias="pageInfo")
-    total_count: Optional[int] = Field(None, alias="totalCount")
+    page_info: PageInfo | None = Field(default=None, alias="pageInfo")
+    total_count: int | None = Field(default=None, alias="totalCount")
 
     model_config = {"populate_by_name": True}
 
@@ -271,22 +271,22 @@ class SearchAgentsRequest(BaseModel):
     """Request body for ``POST /agents/search``."""
 
     filter: str
-    page_size: Optional[int] = Field(None, alias="pageSize", ge=1, le=1000)
-    continuation_token: Optional[str] = Field(None, alias="continuationToken")
+    page_size: int | None = Field(default=None, alias="pageSize", ge=1, le=1000)
+    continuation_token: str | None = Field(default=None, alias="continuationToken")
 
     model_config = {"populate_by_name": True}
 
 
 class SummaryItem(BaseModel):
-    key: Optional[str] = None
-    display_text: Optional[str] = Field(None, alias="displayText")
-    total: Optional[int] = None
+    key: str | None = None
+    display_text: str | None = Field(default=None, alias="displayText")
+    total: int | None = None
 
     model_config = {"populate_by_name": True}
 
 
 class SummaryData(BaseModel):
-    total: Optional[int] = None
+    total: int | None = None
     items: list[SummaryItem] = Field(default_factory=list)
 
     model_config = {"populate_by_name": True}
@@ -295,8 +295,8 @@ class SummaryData(BaseModel):
 class AgentsSummary(BaseModel):
     """Response body for ``GET /agents/summary``."""
 
-    types: Optional[SummaryData] = None
-    statuses: Optional[SummaryData] = None
+    types: SummaryData | None = None
+    statuses: SummaryData | None = None
     spiffe_count: int = Field(0, alias="spiffeCount")
     jwt_count: int = Field(0, alias="jwtCount")
 
@@ -310,8 +310,8 @@ class AgentsSummary(BaseModel):
 
 class McpSource(BaseModel):
     type: McpSourceType
-    predefined_target_id: Optional[str] = Field(None, alias="predefinedTargetId")
-    predefined_target_version: Optional[int] = Field(None, alias="predefinedTargetVersion")
+    predefined_target_id: str | None = Field(default=None, alias="predefinedTargetId")
+    predefined_target_version: int | None = Field(default=None, alias="predefinedTargetVersion")
 
     model_config = {"populate_by_name": True}
 
@@ -340,7 +340,7 @@ class ApiKeyEntry(BaseModel):
 class ApiKeyMetadata(BaseModel):
     """Metadata about a stored API key, as returned on ``McpServerResponse``."""
 
-    created_at: Optional[datetime] = Field(None, alias="createdAt")
+    created_at: datetime | None = Field(default=None, alias="createdAt")
 
     model_config = {"populate_by_name": True}
 
@@ -355,13 +355,13 @@ class McpAuthMethod(BaseModel):
     """
 
     type: McpAuthType
-    authorization_server: Optional[str] = Field(None, alias="authorizationServer")
-    jwks: Optional[str] = Field(None, alias="JWKS")
+    authorization_server: str | None = Field(default=None, alias="authorizationServer")
+    jwks: str | None = Field(default=None, alias="JWKS")
     # OAUTH2.1 only. client_secret and api_keys[].api_key are write-only and
     # never returned by the server.
-    client_id: Optional[str] = Field(None, alias="clientId")
-    client_secret: Optional[str] = Field(None, alias="clientSecret")
-    registration_endpoint: Optional[str] = Field(None, alias="registrationEndpoint")
+    client_id: str | None = Field(default=None, alias="clientId")
+    client_secret: str | None = Field(default=None, alias="clientSecret")
+    registration_endpoint: str | None = Field(default=None, alias="registrationEndpoint")
     # API_KEY / PAT only.
     headers: list[UpstreamHeader] = Field(default_factory=list)
     api_keys: list[ApiKeyEntry] = Field(default_factory=list, alias="apiKeys")
@@ -381,9 +381,7 @@ class McpAuthMethod(BaseModel):
         """
         if isinstance(data, dict) and isinstance(data.get("apiKeys"), list):
             entries = data["apiKeys"]
-            if entries and all(
-                isinstance(e, dict) and "apiKey" not in e for e in entries
-            ):
+            if entries and all(isinstance(e, dict) and "apiKey" not in e for e in entries):
                 data = {**data, "apiKeyMetadata": entries, "apiKeys": []}
         return data
 
@@ -395,32 +393,32 @@ class AuthMethodUpdate(BaseModel):
     cannot change their ``authMethod`` after registration.
     """
 
-    type: Optional[McpAuthType] = None
-    headers: Optional[list[UpstreamHeader]] = None
-    api_keys: Optional[list[ApiKeyEntry]] = Field(None, alias="apiKeys")
+    type: McpAuthType | None = None
+    headers: list[UpstreamHeader] | None = None
+    api_keys: list[ApiKeyEntry] | None = Field(default=None, alias="apiKeys")
 
     model_config = {"populate_by_name": True}
 
 
 class McpServerResponse(BaseModel):
-    id: Optional[str] = None
-    source: Optional[McpSource] = None
-    name: Optional[str] = None
-    description: Optional[str] = None
-    category: Optional[McpCategory] = None
-    gateway_url: Optional[str] = Field(None, alias="gatewayUrl")
+    id: str | None = None
+    source: McpSource | None = None
+    name: str | None = None
+    description: str | None = None
+    category: McpCategory | None = None
+    gateway_url: str | None = Field(default=None, alias="gatewayUrl")
     # OAuth redirect URI for targets using an Idira-managed OAuth app; null
     # for passthrough OAuth, API_KEY, PAT, and NONE targets.
-    callback_url: Optional[str] = Field(None, alias="callbackUrl")
-    upstream: Optional[McpUpstream] = None
-    auth_method: Optional[McpAuthMethod] = Field(None, alias="authMethod")
+    callback_url: str | None = Field(default=None, alias="callbackUrl")
+    upstream: McpUpstream | None = None
+    auth_method: McpAuthMethod | None = Field(default=None, alias="authMethod")
     owners: list[Owner] = Field(default_factory=list)
     tags: dict[str, str] = Field(default_factory=dict)
-    state: Optional[McpState] = None
-    created_at: Optional[datetime] = Field(None, alias="createdAt")
-    updated_at: Optional[datetime] = Field(None, alias="updatedAt")
-    created_by: Optional[str] = Field(None, alias="createdBy")
-    updated_by: Optional[str] = Field(None, alias="updatedBy")
+    state: McpState | None = None
+    created_at: datetime | None = Field(default=None, alias="createdAt")
+    updated_at: datetime | None = Field(default=None, alias="updatedAt")
+    created_by: str | None = Field(default=None, alias="createdBy")
+    updated_by: str | None = Field(default=None, alias="updatedBy")
 
     model_config = {"populate_by_name": True}
 
@@ -448,7 +446,7 @@ class RegisterCustomMcpServerRequest(BaseModel):
     description: str = Field(..., max_length=500)
     category: McpCategory
     upstream: McpUpstream
-    auth_method: Optional[McpAuthMethod] = Field(None, alias="authMethod")
+    auth_method: McpAuthMethod | None = Field(default=None, alias="authMethod")
     owners: list[Owner] = Field(default_factory=list)
     tags: dict[str, str] = Field(default_factory=dict)
 
@@ -471,8 +469,8 @@ class RegisterPredefinedMcpServerRequest(BaseModel):
     """
 
     source: McpSource
-    description: Optional[str] = Field(None, max_length=500)
-    auth_method: Optional[McpAuthMethod] = Field(None, alias="authMethod")
+    description: str | None = Field(None, max_length=500)
+    auth_method: McpAuthMethod | None = Field(default=None, alias="authMethod")
     owners: list[Owner] = Field(default_factory=list)
     tags: dict[str, str] = Field(default_factory=dict)
 
@@ -492,9 +490,7 @@ class RegisterPredefinedMcpServerRequest(BaseModel):
 
 # Accepted by ``TargetsResource.register_mcp_server`` — the caller picks the
 # branch that matches their ``source.type``.
-RegisterMcpServerRequest = Union[
-    RegisterCustomMcpServerRequest, RegisterPredefinedMcpServerRequest
-]
+RegisterMcpServerRequest = Union[RegisterCustomMcpServerRequest, RegisterPredefinedMcpServerRequest]
 
 
 class EditMcpServerRequest(BaseModel):
@@ -504,11 +500,11 @@ class EditMcpServerRequest(BaseModel):
     only) auth_method credential rotation.
     """
 
-    description: Optional[str] = None
-    category: Optional[McpCategory] = None
-    owners: Optional[list[Owner]] = None
-    tags: Optional[dict[str, str]] = None
-    auth_method: Optional[AuthMethodUpdate] = Field(None, alias="authMethod")
+    description: str | None = None
+    category: McpCategory | None = None
+    owners: list[Owner] | None = None
+    tags: dict[str, str] | None = None
+    auth_method: AuthMethodUpdate | None = Field(default=None, alias="authMethod")
 
     model_config = {"populate_by_name": True}
 
@@ -519,7 +515,7 @@ class McpServerStateRequest(BaseModel):
 
 class McpServerListResponse(BaseModel):
     mcp_servers: list[McpServerResponse] = Field(default_factory=list, alias="mcpServers")
-    next_cursor: Optional[str] = Field(None, alias="nextCursor")
+    next_cursor: str | None = Field(default=None, alias="nextCursor")
 
     model_config = {"populate_by_name": True}
 
@@ -532,37 +528,37 @@ class PredefinedMcpTool(BaseModel):
 
 
 class PredefinedMcpTarget(BaseModel):
-    id: Optional[str] = None
+    id: str | None = None
     # The predefined catalog returns "version" while registered-target payloads
     # use "predefinedTargetVersion".  Accept both so the same model works for
     # both response shapes.
-    predefined_target_version: Optional[int] = Field(
+    predefined_target_version: int | None = Field(
         None,
         validation_alias=AliasChoices("predefinedTargetVersion", "version"),
         serialization_alias="predefinedTargetVersion",
     )
-    name: Optional[str] = None
-    icon_id: Optional[str] = Field(None, alias="iconId")
-    description: Optional[str] = None
-    category: Optional[McpCategory] = None
-    upstream: Optional[McpUpstream] = None
+    name: str | None = None
+    icon_id: str | None = Field(default=None, alias="iconId")
+    description: str | None = None
+    category: McpCategory | None = None
+    upstream: McpUpstream | None = None
     # Predefined catalog returns authMethod as a plain string ("NONE",
     # "OAUTH2.1"); registered-target payloads return it as an object
     # {"type": "NONE"}.  Coerce the string form to the object form.
-    auth_method: Optional[McpAuthMethod] = Field(None, alias="authMethod")
+    auth_method: McpAuthMethod | None = Field(default=None, alias="authMethod")
     tags: dict[str, str] = Field(default_factory=dict)
-    created_at: Optional[datetime] = Field(None, alias="createdAt")
+    created_at: datetime | None = Field(default=None, alias="createdAt")
     # Per-tenant OAuth callback URL; present only for OAuth 2.1 templates
     # routed through the gateway.
-    callback_url: Optional[str] = Field(None, alias="callbackUrl")
+    callback_url: str | None = Field(default=None, alias="callbackUrl")
     # How OAuth client registration is performed for this template ("dynamic"
     # or "manual"); present only for OAuth 2.1 templates.
-    oauth_application_registration: Optional[OauthApplicationRegistration] = Field(
+    oauth_application_registration: OauthApplicationRegistration | None = Field(
         None, alias="oauthApplicationRegistration"
     )
     # RFC 7591 dynamic-client-registration endpoint; present only for
     # "dynamic" OAuth 2.1 templates.
-    registration_endpoint: Optional[str] = Field(None, alias="registrationEndpoint")
+    registration_endpoint: str | None = Field(default=None, alias="registrationEndpoint")
 
     model_config = {"populate_by_name": True}
 
@@ -599,9 +595,9 @@ class PredefinedMcpListResponse(BaseModel):
 
 
 class ApiError(BaseModel):
-    code: Optional[str] = None
-    message: Optional[str] = None
-    description: Optional[str] = None
+    code: str | None = None
+    message: str | None = None
+    description: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -633,8 +629,8 @@ class Condition(BaseModel):
     """
 
     op: ConditionOp
-    key: Optional[str] = None
-    value: Optional[Union[list[str], str]] = None
+    key: str | None = None
+    value: list[str] | str | None = None
 
     model_config = {"populate_by_name": True}
 
@@ -654,19 +650,19 @@ class PolicyInput(BaseModel):
     """
 
     name: str = Field(..., min_length=1, max_length=256)
-    description: Optional[str] = Field(None, max_length=500)
+    description: str | None = Field(None, max_length=500)
     tags: dict[str, Any] = Field(default_factory=dict)
     state: PolicyState
     owners: list[Owner] = Field(default_factory=list)
     access_type: PolicyAccessType = Field(..., alias="accessType")
     agent: list[ConditionGroup] = Field(..., min_length=1)
-    user: Optional[list[ConditionGroup]] = None
+    user: list[ConditionGroup] | None = None
     resources: list[ConditionGroup] = Field(..., min_length=1)
 
     model_config = {"populate_by_name": True}
 
     @model_validator(mode="after")
-    def _validate_user_grant(self) -> "PolicyInput":
+    def _validate_user_grant(self) -> PolicyInput:
         if self.access_type == PolicyAccessType.ON_BEHALF_OF:
             if not self.user:
                 raise ValueError("user is required when accessType is ON_BEHALF_OF")
@@ -685,33 +681,33 @@ class PolicyUpdate(BaseModel):
     ``accessType`` isn't part of the update payload.
     """
 
-    name: Optional[str] = Field(None, min_length=1, max_length=256)
-    description: Optional[str] = Field(None, max_length=500)
-    tags: Optional[dict[str, Any]] = None
-    state: Optional[PolicyState] = None
-    owners: Optional[list[Owner]] = None
-    agent: Optional[list[ConditionGroup]] = None
-    user: Optional[list[ConditionGroup]] = None
-    resources: Optional[list[ConditionGroup]] = None
+    name: str | None = Field(None, min_length=1, max_length=256)
+    description: str | None = Field(None, max_length=500)
+    tags: dict[str, Any] | None = None
+    state: PolicyState | None = None
+    owners: list[Owner] | None = None
+    agent: list[ConditionGroup] | None = None
+    user: list[ConditionGroup] | None = None
+    resources: list[ConditionGroup] | None = None
 
     model_config = {"populate_by_name": True}
 
 
 class PolicyOutput(BaseModel):
-    id: Optional[str] = None
-    name: Optional[str] = None
-    description: Optional[str] = None
+    id: str | None = None
+    name: str | None = None
+    description: str | None = None
     tags: dict[str, Any] = Field(default_factory=dict)
     owners: list[Owner] = Field(default_factory=list)
-    state: Optional[PolicyState] = None
-    access_type: Optional[PolicyAccessType] = Field(None, alias="accessType")
+    state: PolicyState | None = None
+    access_type: PolicyAccessType | None = Field(default=None, alias="accessType")
     agent: list[ConditionGroup] = Field(default_factory=list)
-    user: Optional[list[ConditionGroup]] = None
+    user: list[ConditionGroup] | None = None
     resources: list[ConditionGroup] = Field(default_factory=list)
-    created_at: Optional[datetime] = Field(None, alias="createdAt")
-    updated_at: Optional[datetime] = Field(None, alias="updatedAt")
-    created_by: Optional[str] = Field(None, alias="createdBy")
-    updated_by: Optional[str] = Field(None, alias="updatedBy")
+    created_at: datetime | None = Field(default=None, alias="createdAt")
+    updated_at: datetime | None = Field(default=None, alias="updatedAt")
+    created_by: str | None = Field(default=None, alias="createdBy")
+    updated_by: str | None = Field(default=None, alias="updatedBy")
 
     model_config = {"populate_by_name": True}
 
@@ -728,7 +724,7 @@ class PolicyOutput(BaseModel):
 
 class ListPolicyOutput(BaseModel):
     policies: list[PolicyOutput] = Field(default_factory=list)
-    next_cursor: Optional[str] = Field(None, alias="nextCursor")
+    next_cursor: str | None = Field(default=None, alias="nextCursor")
 
     model_config = {"populate_by_name": True}
 
@@ -738,8 +734,8 @@ class PolicyStateRequest(BaseModel):
 
 
 class PolicyStateResponse(BaseModel):
-    id: Optional[str] = None
-    state: Optional[PolicyState] = None
+    id: str | None = None
+    state: PolicyState | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -748,8 +744,8 @@ class PolicyStateResponse(BaseModel):
 
 
 class ActivityMapDateRange(BaseModel):
-    start: Optional[str] = None
-    end: Optional[str] = None
+    start: str | None = None
+    end: str | None = None
 
 
 class ActivityMapReport(BaseModel):
@@ -759,7 +755,7 @@ class ActivityMapReport(BaseModel):
     a follow-up GET to it to retrieve the actual report file.
     """
 
-    download_url: Optional[str] = Field(None, alias="downloadUrl")
-    date_range: Optional[ActivityMapDateRange] = Field(None, alias="dateRange")
+    download_url: str | None = Field(default=None, alias="downloadUrl")
+    date_range: ActivityMapDateRange | None = Field(default=None, alias="dateRange")
 
     model_config = {"populate_by_name": True}

@@ -29,10 +29,7 @@ jobs:
         run: uv sync --extra dev --extra test --python ${{ matrix.python-version }}
 
       - name: Lint (ruff)
-        run: >
-          uv run ruff check --select F,I,E501
-          --extend-exclude secai/cli/targets_cmds.py,secai/cli/policies_cmds.py,secai/cli/agents_cmds.py,secai/cli/reports_cmds.py,secai/secai-cli.py,tests/test_targets_cli.py,tests/test_agents_cli.py
-          secai tests
+        run: uv run ruff check secai tests
 
       - name: Test (offline suite)
         run: >
@@ -40,7 +37,7 @@ jobs:
           tests/test_pagination.py -v
 
   mypy:
-    name: Type-check (mypy, informational)
+    name: Type-check (mypy)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -54,5 +51,4 @@ jobs:
         run: uv sync --extra dev --extra test
 
       - name: mypy
-        continue-on-error: true
         run: uv run mypy secai
