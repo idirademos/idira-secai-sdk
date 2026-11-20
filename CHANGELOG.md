@@ -4,6 +4,19 @@ All notable changes to this project are documented here. Versioning follows
 [SemVer](https://semver.org/); since the package is pre-1.0, any `0.x` bump
 may include breaking changes.
 
+## Releasing a new version
+
+1. Bump the `version` field in `pyproject.toml` — this is the **only** place the version number
+   is written by hand. `secai.__version__` (and `secai-cli --version`) read it automatically at
+   runtime via `importlib.metadata`, so nothing in `secai/` needs to change.
+2. Regenerate the lockfile so it records the new version: `uv lock`.
+3. Add a new entry at the top of this file describing what changed, following the existing
+   entries' format (group by **Breaking changes** / new features / fixes as applicable).
+4. Reinstall locally to pick up the new version in your dev environment: `pip install -e .` (or
+   `uv sync`), then spot-check with `secai-cli --version`.
+5. Commit `pyproject.toml`, `uv.lock`, and `CHANGELOG.md` together, then tag the release
+   (e.g. `git tag v0.3.0 && git push --tags`).
+
 ## 0.2.0
 
 **Breaking changes** — the SDK was rewritten to match a new version of the

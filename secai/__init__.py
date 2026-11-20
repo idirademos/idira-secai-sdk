@@ -1,5 +1,8 @@
 """SecAI — CyberArk Secure AI Python SDK."""
 
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _pkg_version
+
 from .client import SecAIClient
 from .exceptions import (
     AuthenticationError,
@@ -155,4 +158,11 @@ __all__ = [
     "ApiError",
 ]
 
-__version__ = "0.2.0"
+try:
+    # Single source of truth is the `version` in pyproject.toml; this reads
+    # the installed package's metadata instead of duplicating the string
+    # here. Only fails if secai is imported from an uninstalled source
+    # checkout (e.g. no `pip install -e .` yet).
+    __version__ = _pkg_version("secai")
+except PackageNotFoundError:  # pragma: no cover
+    __version__ = "0.0.0+unknown"

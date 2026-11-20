@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 from rich import print_json
 from rich.console import Console
 
+from .. import __version__
 from ..exceptions import SecAIError
 
 load_dotenv()
@@ -27,6 +28,25 @@ app = typer.Typer(
 
 console = Console()
 err_console = Console(stderr=True)
+
+
+def _version_callback(value: bool) -> None:
+    if value:
+        typer.echo(f"secai-cli {__version__}")
+        raise typer.Exit()
+
+
+@app.callback()
+def _main(
+    version: bool = typer.Option(
+        False,
+        "--version",
+        callback=_version_callback,
+        is_eager=True,
+        help="Show the secai-cli version and exit.",
+    ),
+) -> None:
+    """CyberArk Secure AI API — agent and MCP server management."""
 
 
 # ---------------------------------------------------------------------------

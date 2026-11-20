@@ -763,6 +763,8 @@ Commands:
 
 ### Global Options
 
+`secai-cli --version` prints the installed SDK/CLI version and exits (no credentials needed).
+
 Two ways to authenticate — pick whichever fits your workflow:
 
 **Option A — one-time login (recommended for interactive/manual testing):**
