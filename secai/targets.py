@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any, Iterator, Optional, Union
 
 from .models import (
     EditMcpServerRequest,
@@ -55,6 +55,26 @@ class TargetsResource:
             params=params or None,
         )
         return McpServerListResponse.model_validate(body)
+
+    # ------------------------------------------------------------------
+    # GET /api/targets/mcp-servers (pagination helper)
+    # ------------------------------------------------------------------
+
+    def iter_all_mcp_servers(
+        self, *, page_size: Optional[int] = None
+    ) -> Iterator[McpServerResponse]:
+        """Yield every registered MCP server, transparently paging through results.
+
+        Equivalent to repeatedly calling :meth:`list_mcp_servers` and following
+        ``next_cursor`` until the server stops returning one.
+        """
+        next_cursor: Optional[str] = None
+        while True:
+            page = self.list_mcp_servers(page_size=page_size, next_cursor=next_cursor)
+            yield from page.mcp_servers
+            next_cursor = page.next_cursor
+            if not next_cursor or not page.mcp_servers:
+                return
 
     # ------------------------------------------------------------------
     # POST /api/targets/mcp-servers

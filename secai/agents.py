@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import builtins
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Iterator, Optional
 
 from .models import (
     Agent,
@@ -57,6 +57,24 @@ class AgentsResource:
             "GET", "/api/agents", accept=_ACCEPT, params=params or None
         )
         return ListAgentsResponse.model_validate(body)
+
+    # ------------------------------------------------------------------
+    # GET /api/agents (pagination helper)
+    # ------------------------------------------------------------------
+
+    def iter_all(self, *, page_size: Optional[int] = None) -> Iterator[Agent]:
+        """Yield every agent in the tenant, transparently paging through results.
+
+        Equivalent to repeatedly calling :meth:`list` and following
+        ``page_info.continuation_token`` until the server stops returning one.
+        """
+        continuation_token: Optional[str] = None
+        while True:
+            page = self.list(page_size=page_size, continuation_token=continuation_token)
+            yield from page.agents
+            continuation_token = page.page_info.continuation_token if page.page_info else None
+            if not continuation_token or not page.agents:
+                return
 
     # ------------------------------------------------------------------
     # POST /api/agents/search

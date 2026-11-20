@@ -1,8 +1,13 @@
 # SecAI Python SDK
 
+[![CI](https://github.com/idirademos/idira-secai-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/idirademos/idira-secai-sdk/actions/workflows/ci.yml)
+
 The **SecAI SDK** is the official Python client for the [Idira Secure AI API](secai-api.yaml).
 It lets you register, govern, and control AI agents and their MCP (Model Context Protocol) server
 targets from Python code or a command-line interface.
+
+> **Current version: 0.2.0.** This release includes breaking API changes versus `0.1.0` — see
+> [CHANGELOG.md](CHANGELOG.md) before upgrading.
 
 | Component                      | What it gives you                                                                |
 | ------------------------------ | -------------------------------------------------------------------------------- |
@@ -18,7 +23,9 @@ targets from Python code or a command-line interface.
 1. [Requirements](#requirements)
 2. [Installation](#installation)
 3. [Configuration](#configuration)
-4. [Python Library](#python-library)
+4. [Credential Storage](#credential-storage)
+5. [Resilience](#resilience)
+6. [Python Library](#python-library)
    - [SecAIClient](#secaiclient)
    - [Agents Resource](#agents-resource)
    - [Targets Resource](#targets-resource)
@@ -26,7 +33,7 @@ targets from Python code or a command-line interface.
    - [Reports Resource](#reports-resource)
    - [Data Models](#data-models)
    - [Error Handling](#error-handling)
-5. [CLI Reference](#cli-reference)
+7. [CLI Reference](#cli-reference)
    - [Global Options](#global-options)
    - [login / logout / whoami](#login--logout--whoami)
    - [agents commands](#agents-commands)
@@ -34,9 +41,9 @@ targets from Python code or a command-line interface.
    - [policies commands](#policies-commands)
    - [reports commands](#reports-commands)
    - [Output Formats](#output-formats)
-6. [Running the Tests](#running-the-tests)
-7. [Quickstart Example](#quickstart-example)
-8. [Project Layout](#project-layout)
+8. [Running the Tests](#running-the-tests)
+9. [Quickstart Example](#quickstart-example)
+10. [Project Layout](#project-layout)
 
 ---
 
@@ -88,6 +95,10 @@ uv add "secai[dev,test]"
 The dev extras include the ruff linter, mypy type checker, and pre-commit git hook manager packages.
 The test extras include pytest and pytest-httpx test driver packages.
 
+`keyring` (used to store `secai-cli login` credentials in the OS keychain/credential store) is a
+required core dependency, so it's installed automatically with the package — no extra needed. See
+[Credential Storage](#credential-storage) below for how the actual backend is selected at runtime.
+
 > **Note:** When working from a source checkout, prefix every CLI invocation with `uv run`
 > (e.g. `uv run secai-cli agents list`) so it uses the project's managed virtual environment.
 > After a `uv tool install` the `secai-cli` entry point is on your `$PATH` and no prefix is needed.
@@ -98,16 +109,18 @@ The test extras include pytest and pytest-httpx test driver packages.
 
 The SDK reads configuration from environment variables or a `.env` file placed in the working directory.
 
-| Variable             | CLI option                        | Description                                                                                     |
-| -------------------- | --------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `SECAI_TENANT_URL`   | `--tenant-url` / `-u`             | Base URL of your Idira tenant, e.g. `https://mytenant.cyberark.cloud`                           |
-| `SECAI_TOKEN`        | `--token` / `-t`                  | Bearer JWT for authentication                                                                   |
-| `SECAI_OUTPUT`       | `--output` / `-o`                 | Default output format: `table` (default), `json`, `quiet`                                       |
-| `SECAI_TIMEOUT`      | `--timeout`                       | HTTP timeout in seconds (default: `30`)                                                         |
-| `SECAI_CONFIG_DIR`   | —                                 | Override the directory used to cache `secai-cli login` credentials (default: `~/.config/secai`) |
-| `IDIRA_IDENTITY_URL` | `secai-cli login --identity-url`  | CyberArk Identity API base URL, used by `secai-cli login`'s OAuth2 exchange                     |
-| `IDIRA_ADMIN_USER`   | `secai-cli login --client-id`     | OAuth service account client ID, used by `secai-cli login`'s OAuth2 exchange                    |
-| `IDIRA_ADMIN_PWD`    | `secai-cli login --client-secret` | OAuth service account client secret, used by `secai-cli login`'s OAuth2 exchange                |
+| Variable             | CLI option                        | Description                                                                                                                |
+| -------------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `SECAI_TENANT_URL`   | `--tenant-url` / `-u`             | Base URL of your Idira tenant, e.g. `https://mytenant.cyberark.cloud`                                                      |
+| `SECAI_TOKEN`        | `--token` / `-t`                  | Bearer JWT for authentication                                                                                              |
+| `SECAI_OUTPUT`       | `--output` / `-o`                 | Default output format: `table` (default), `json`, `quiet`                                                                  |
+| `SECAI_TIMEOUT`      | `--timeout`                       | HTTP timeout in seconds (default: `30`)                                                                                    |
+| `SECAI_MAX_RETRIES`  | —                                 | Max automatic retries for transient HTTP failures (default: `3`, see [Resilience](#resilience))                            |
+| `SECAI_CONFIG_DIR`   | —                                 | Override the directory used to cache `secai-cli login` credentials (default: `~/.config/secai`)                            |
+| `SECAI_NO_KEYRING`   | —                                 | Set to force the plaintext credentials file even when the OS keyring works (see [Credential Storage](#credential-storage)) |
+| `IDIRA_IDENTITY_URL` | `secai-cli login --identity-url`  | CyberArk Identity API base URL, used by `secai-cli login`'s OAuth2 exchange                                                |
+| `IDIRA_ADMIN_USER`   | `secai-cli login --client-id`     | OAuth service account client ID, used by `secai-cli login`'s OAuth2 exchange                                               |
+| `IDIRA_ADMIN_PWD`    | `secai-cli login --client-secret` | OAuth service account client secret, used by `secai-cli login`'s OAuth2 exchange                                           |
 
 Example `.env` file:
 
@@ -118,12 +131,64 @@ SECAI_TOKEN=eyJhbGciOiJSUzI1NiJ9...
 
 > **Security note:** Bearer tokens are never written to disk, logs, or stdout by the SDK itself.
 > The CLI's `secai-cli login` command is the one exception — it caches the resolved tenant
-> URL/token in `~/.config/secai/credentials.json` (mode `0600`) so you don't need to export env
-> vars every session. By default `login` never requires you to paste a raw JWT: it exchanges a
-> service account's `client_id`/`client_secret` for a token via OAuth2 `client_credentials`
-> (see [login / logout / whoami](#login--logout--whoami)). Explicit `SECAI_TENANT_URL`/
-> `SECAI_TOKEN` env vars always take precedence over a cached login (useful for CI).
+> URL/token (see [Credential Storage](#credential-storage) for exactly where) so you don't need
+> to export env vars every session. By default `login` never requires you to paste a raw JWT: it
+> exchanges a service account's `client_id`/`client_secret` for a token via OAuth2
+> `client_credentials` (see [login / logout / whoami](#login--logout--whoami)). Explicit
+> `SECAI_TENANT_URL`/`SECAI_TOKEN` env vars always take precedence over a cached login (useful
+> for CI).
+> **When OAuth was used to log in**, the cache additionally stores the `identity_url`/`client_id`/
+> `client_secret` so the CLI can silently re-authenticate when a cached token expires (see
+> [Resilience](#resilience)) — this means the cached entry is then at least as sensitive as
+> the underlying service-account secret, not just a short-lived token. Logging in with `--token`
+> avoids this (only the token itself is cached, with no automatic refresh).
 > Agent `clientSecret` values are printed once on registration — store them in a secrets manager immediately.
+
+---
+
+## Credential Storage
+
+`secai-cli login` stores its cache in the OS-native secret store when possible, falling back to
+a plaintext file otherwise — there's no platform-specific configuration needed, it's detected
+automatically on every `login`/`whoami`/`logout`:
+
+1. **OS keyring** (preferred): `keyring` is a required dependency, so it's always installed.
+   macOS Keychain and Windows Credential Locker work out of the box. Linux requires a running
+   Secret Service daemon (GNOME Keyring, KWallet) with an unlocked session — true on most Linux
+   desktops, but typically not available on headless servers, SSH-only boxes, or CI
+   containers.
+2. **Plaintext file** (fallback): `~/.config/secai/credentials.json`, mode `0600`
+   (owner-read/write only). Used automatically when no keyring backend is usable on the current
+   machine (e.g. headless Linux), or `SECAI_NO_KEYRING` is set. Override the directory with
+   `SECAI_CONFIG_DIR`.
+
+`secai-cli login` prints which backend it used; `secai-cli whoami` shows it too (`Source:`
+line). A plaintext cache left over from a machine/session where no keyring backend was available
+is opportunistically migrated into the keyring (and the file deleted) the next time any command
+reads it on a machine where one becomes usable — no need to run `login` again. `secai-cli logout`
+clears both locations. Set `SECAI_NO_KEYRING=1` to always use the plaintext file even on a machine
+where the keyring would otherwise work.
+
+---
+
+## Resilience
+
+Both the `SecAIClient` and the CLI automatically retry transient HTTP failures and can
+silently refresh an expired token:
+
+- **Retry/backoff** — connection errors, timeouts, and HTTP `429`/`502`/`503`/`504` responses
+  are retried regardless of method; a plain `500` is retried only for `GET` requests (write
+  requests may have partially applied server-side, so they are not blindly retried). Retries use
+  exponential backoff with jitter, honoring a `Retry-After` header when the server provides one.
+  Configure the retry budget with the `max_retries` constructor parameter or the
+  `SECAI_MAX_RETRIES` env var (default `3`; set to `0` to disable retries).
+- **Automatic token refresh on 401** — if a request returns `401 Unauthorized`, the client will
+  make a single attempt to obtain a fresh token and retry the request once before giving up. In
+  the Python library this requires passing a `token_refresher` callable to `SecAIClient`; the CLI
+  wires this up automatically whenever you're authenticated via `secai-cli login` or
+  `IDIRA_IDENTITY_URL`/`IDIRA_ADMIN_USER`/`IDIRA_ADMIN_PWD` env vars, preferring the env vars
+  (never touches disk) over the cached login when both are available. `secai-cli whoami` shows
+  whether auto-refresh is active for your current session.
 
 ---
 
@@ -152,12 +217,16 @@ with SecAIClient() as client:
 
 #### Constructor parameters
 
-| Parameter    | Type          | Default             | Description                                          |
-| ------------ | ------------- | ------------------- | ---------------------------------------------------- |
-| `tenant_url` | `str \| None` | `$SECAI_TENANT_URL` | Tenant base URL                                      |
-| `token`      | `str \| None` | `$SECAI_TOKEN`      | Bearer JWT                                           |
-| `timeout`    | `float`       | `30.0`              | Per-request timeout in seconds                       |
-| `verify_ssl` | `bool`        | `True`              | Disable only for local testing — never in production |
+| Parameter         | Type                        | Default             | Description                                                        |
+| ----------------- | --------------------------- | ------------------- | ------------------------------------------------------------------ |
+| `tenant_url`      | `str \| None`               | `$SECAI_TENANT_URL` | Tenant base URL                                                    |
+| `token`           | `str \| None`               | `$SECAI_TOKEN`      | Bearer JWT                                                         |
+| `timeout`         | `float`                     | `30.0`              | Per-request timeout in seconds                                     |
+| `verify_ssl`      | `bool`                      | `True`              | Disable only for local testing — never in production               |
+| `max_retries`     | `int`                       | `3`                 | Max retries for transient failures (see [Resilience](#resilience)) |
+| `backoff_factor`  | `float`                     | `0.5`               | Base delay multiplier for exponential backoff                      |
+| `max_backoff`     | `float`                     | `8.0`               | Cap on the computed backoff delay, in seconds                      |
+| `token_refresher` | `Callable[[], str] \| None` | `None`              | Optional callback invoked once to obtain a new token after a `401` |
 
 ---
 
@@ -176,6 +245,15 @@ for a in page.agents:
 
 if page.page_info and page.page_info.continuation_token:
     next_page = client.agents.list(continuation_token=page.page_info.continuation_token)
+```
+
+#### `iter_all(*, page_size=None) → Iterator[Agent]`
+
+Yield every agent in the tenant, transparently paging through `list()` under the hood.
+
+```python
+for agent in client.agents.iter_all(page_size=100):
+    print(agent.id, agent.name)
 ```
 
 #### `search(request) → ListAgentsResponse`
@@ -323,6 +401,15 @@ if page.next_cursor:
     page2 = client.targets.list_mcp_servers(next_cursor=page.next_cursor)
 ```
 
+#### `iter_all_mcp_servers(*, page_size=None) → Iterator[McpServerResponse]`
+
+Yield every registered MCP server, transparently paging through `list_mcp_servers()` under the hood.
+
+```python
+for server in client.targets.iter_all_mcp_servers(page_size=100):
+    print(server.id, server.name)
+```
+
 #### `register_mcp_server(request) → McpServerResponse`
 
 Register a custom or predefined MCP server. The request type now depends on the source: pass a
@@ -451,6 +538,15 @@ or `AUTONOMOUS`ly, and under what conditions (agent/user/resource/match rules).
 page = client.policies.list(page_size=50)
 for policy in page.policies:
     print(policy.id, policy.name, policy.state)
+```
+
+#### `iter_all(*, page_size=None) → Iterator[PolicyOutput]`
+
+Yield every access policy in the tenant, transparently paging through `list()` under the hood.
+
+```python
+for policy in client.policies.iter_all(page_size=100):
+    print(policy.id, policy.name)
 ```
 
 #### `create(request) → PolicyOutput`
@@ -722,10 +818,15 @@ secai-cli whoami
   directly. Otherwise, `login` exchanges a service account's `client_id`/`client_secret` for a
   token via OAuth2 `client_credentials` (`POST {identity_url}/oauth2/platformtoken`), so you
   never need to copy/paste a raw JWT. Either way, the resolved token is verified with a test API
-  call, then cached at `~/.config/secai/credentials.json` (mode `0600`, owner-read/write only).
-  Override the cache location with `SECAI_CONFIG_DIR`.
-- `logout` — deletes the cached credentials file.
-- `whoami` — prints the currently cached tenant URL and a masked token (does not call the API).
+  call, then cached via the OS keyring or a `0600` plaintext file — see
+  [Credential Storage](#credential-storage) for how that's chosen, and `login`'s own output for
+  which one was actually used. When the OAuth exchange was used, the
+  `identity_url`/`client_id`/`client_secret` are cached alongside the token so the CLI can
+  silently re-authenticate on a `401` without re-running `login` (see [Resilience](#resilience));
+  logging in with `--token` opts out of this and only caches the token itself.
+- `logout` — deletes the cached credentials from both the OS keyring and the plaintext file.
+- `whoami` — prints the currently cached tenant URL, a masked token, the active storage backend,
+  and whether auto-refresh on expiry is available for the current session (does not call the API).
 
 ---
 
@@ -1169,10 +1270,24 @@ echo "Created agent: $AGENT_ID"
 
 ## Running the Tests
 
-Most of the test suite (`test_agents_cli.py`, `test_targets_cli.py`) makes real API calls
-against a live tenant. `test_auth.py` is the exception — it covers the local credential cache
-and `secai-cli login`/`logout`/`whoami` with `pytest-httpx` mocks, so it runs fully offline with
-no tenant credentials required.
+Most of the test suite (`test_agents_cli.py`, `test_targets_cli.py`, `test_policies_cli.py`,
+`test_reports_cli.py`) makes real API calls against a live tenant. `test_auth.py`,
+`test_client_resilience.py`, and `test_pagination.py` are the exceptions — they cover the local
+credential cache, `secai-cli login`/`logout`/`whoami`, the HTTP client's retry/backoff/
+auto-refresh behavior, and the `iter_all*` pagination helpers using `pytest-httpx` mocks, so they
+run fully offline with no tenant credentials required.
+
+**CI** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs on every push to `main` and
+every pull request, across Python 3.10–3.13:
+
+- `ruff check` (scoped to the `F`/`I`/`E501` rules, with a few pre-existing CLI files excluded —
+  see the workflow's comments) and the offline pytest suite above are **blocking**.
+- `mypy` runs across the whole `secai` package but is currently **informational only**
+  (`continue-on-error`) — the project's `strict = true` mypy config surfaces some pre-existing
+  type errors unrelated to any single change, so it reports without blocking merges until that
+  debt is cleaned up.
+- The full live-tenant suite isn't run in CI since it needs real credentials; run it locally as
+  described below before releasing.
 
 Configure credentials first (only needed for the live tests):
 
@@ -1195,8 +1310,20 @@ pytest tests/test_agents_cli.py -v
 # Targets only
 pytest tests/test_targets_cli.py -v
 
+# Policies only
+pytest tests/test_policies_cli.py -v
+
+# Reports only
+pytest tests/test_reports_cli.py -v
+
 # Auth/login — offline, no tenant credentials needed
 pytest tests/test_auth.py -v
+
+# HTTP client retry/backoff/auto-refresh — offline, no tenant credentials needed
+pytest tests/test_client_resilience.py -v
+
+# Pagination helpers (iter_all) — offline, no tenant credentials needed
+pytest tests/test_pagination.py -v
 
 # Run with explicit credentials (overrides .env.test)
 SECAI_TENANT_URL=https://my.cyberark.cloud \
@@ -1213,7 +1340,20 @@ pytest tests/ -v
 - Negative-path tests verify that the correct HTTP error code appears on stderr.
 - `test_auth.py` isolates the credential cache per-test via a `tmp_path`-based fixture and
   mocks both the OAuth2 token endpoint and the login validation call, so it never touches the
-  real filesystem location (`~/.config/secai`) or network.
+  real filesystem location (`~/.config/secai`) or network. An autouse fixture also stubs
+  `_import_keyring()` to report "unavailable" by default so tests never read/write the _real_
+  OS keychain. Its `TestKeyringBackend` class explicitly re-patches that stub with a fake
+  `keyring` module to exercise the OS-keyring storage backend (available/working,
+  installed-but-unusable, opportunistic file→keyring migration, `SECAI_NO_KEYRING`) fully
+  offline, regardless of what keyring backend (if any) happens to be usable on the machine
+  running the tests.
+- `test_client_resilience.py` drives `_BaseClient` directly with `pytest-httpx` to assert the
+  retry/backoff and 401 auto-refresh behavior (exhaustion, `Retry-After` handling, GET-only
+  retry of plain `500`s, successful/failed reauth) without any real HTTP traffic.
+- `test_pagination.py` mocks each resource's list endpoint with `pytest-httpx` to verify the
+  `iter_all()`/`iter_all_mcp_servers()` generators follow `continuation_token`/`next_cursor`
+  across multiple pages and stop on an empty or token-less page (including a defensive case
+  where a buggy server returns an empty page alongside a non-null cursor).
 
 ---
 
@@ -1284,6 +1424,8 @@ Done.
 
 ```plaintext
 idira-secai-sdk/
+├── .github/workflows/ci.yml    # CI: ruff + offline pytest (blocking), mypy (informational)
+├── CHANGELOG.md                # Version history, including breaking changes
 ├── pyproject.toml              # Package metadata and dependencies
 ├── scratch/                    # API spec + diff/usage notes (not part of the package)
 │
@@ -1299,7 +1441,7 @@ idira-secai-sdk/
 │   └── cli/
 │       ├── __init__.py
 │       ├── main.py             # Typer app + sub-group registration
-│       ├── auth.py             # Local credential cache (login/logout/whoami backend)
+│       ├── auth.py             # Local credential cache + OAuth exchange + token refresher
 │       ├── auth_cmds.py        # login/logout/whoami top-level commands
 │       ├── agents_cmds.py      # agents list/search/summary/register/get/edit/delete/
 │       │                       #        set-state/list-authn-descriptors/delete-authn-descriptor
@@ -1313,7 +1455,11 @@ idira-secai-sdk/
 │   ├── conftest.py             # Session fixtures (live agent + MCP server)
 │   ├── test_agents_cli.py      # Agent test cases (positive + negative)
 │   ├── test_targets_cli.py     # Target test cases (positive + negative)
-│   └── test_auth.py            # login/logout/whoami + credential cache (offline, mocked)
+│   ├── test_policies_cli.py    # Policy test cases (positive + negative)
+│   ├── test_reports_cli.py     # Report test cases (positive + negative)
+│   ├── test_auth.py            # login/logout/whoami + credential cache (offline, mocked)
+│   ├── test_client_resilience.py  # Retry/backoff + 401 auto-refresh (offline, mocked)
+│   └── test_pagination.py      # iter_all()/iter_all_mcp_servers() helpers (offline, mocked)
 │
 └── sdk-quickstart/
     └── quickstart.py           # Annotated end-to-end walkthrough

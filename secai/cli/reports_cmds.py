@@ -12,7 +12,7 @@ from rich.console import Console
 
 from ..client import SecAIClient
 from ..exceptions import SecAIError
-from .auth import resolve_credentials
+from .auth import build_token_refresher, resolve_credentials
 
 reports_app = typer.Typer(no_args_is_help=True)
 console = Console()
@@ -25,6 +25,8 @@ def _client() -> SecAIClient:
         tenant_url=tenant_url,
         token=token,
         timeout=float(os.environ.get("SECAI_TIMEOUT", "30")),
+        max_retries=int(os.environ.get("SECAI_MAX_RETRIES", "3")),
+        token_refresher=build_token_refresher(tenant_url) if tenant_url else None,
     )
 
 

@@ -13,8 +13,8 @@ from ..client import SecAIClient
 from ..exceptions import SecAIError
 from .auth import (
     TokenFetchError,
+    active_backend,
     clear_credentials,
-    credentials_path,
     fetch_access_token,
     load_credentials,
     save_credentials,
@@ -53,7 +53,12 @@ def login(
         help="OAuth service account client secret (default: $IDIRA_ADMIN_PWD)",
     ),
 ) -> None:
-    """Authenticate and cache credentials locally (~/.config/secai/credentials.json).
+    """Authenticate and cache credentials locally.
+
+    Credentials are stored in the OS keyring when available (macOS Keychain,
+    Windows Credential Locker, or a Linux Secret Service daemon), falling
+    back to a 0600 plaintext file at ~/.config/secai/credentials.json
+    otherwise — see `secai-cli whoami` for where they ended up.
 
     By default this exchanges a service account's client_id/client_secret for a
     bearer access token via OAuth2 client_credentials, so you never need to
@@ -66,6 +71,8 @@ def login(
     tenant_url = tenant_url or os.environ.get("SECAI_TENANT_URL")
     if not tenant_url:
         tenant_url = typer.prompt("Tenant URL")
+
+    used_oauth = token is None
 
     if not token:
         identity_url = identity_url or os.environ.get("IDIRA_IDENTITY_URL")
@@ -99,9 +106,21 @@ def login(
             )
             raise typer.Exit(code=1) from exc
 
-    save_credentials(tenant_url, token)
+    if used_oauth:
+        # Cache the service-account identity too, so an expired token can be
+        # silently refreshed later without re-running `login` (see
+        # auth.build_token_refresher).
+        save_credentials(
+            tenant_url,
+            token,
+            identity_url=identity_url,
+            client_id=client_id,
+            client_secret=client_secret,
+        )
+    else:
+        save_credentials(tenant_url, token)
     console.print(f"[bold green]Logged in[/bold green] to {tenant_url}")
-    console.print(f"Credentials cached at {credentials_path()}")
+    console.print(f"Credentials stored via {active_backend()}")
 
 
 def logout() -> None:
@@ -123,4 +142,6 @@ def whoami() -> None:
     masked = cached["token"][:8] + "…" if len(cached["token"]) > 8 else "***"
     console.print(f"Tenant URL: {cached['tenant_url']}")
     console.print(f"Token:      {masked}")
-    console.print(f"Source:     {credentials_path()}")
+    console.print(f"Source:     {active_backend()}")
+    auto_refresh = "yes" if cached.get("client_id") else "no"
+    console.print(f"Auto-refresh on expiry: {auto_refresh}")

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Iterator, Optional
 
 from .models import (
     ListPolicyOutput,
@@ -54,6 +54,24 @@ class PoliciesResource:
             "GET", "/api/policies", accept=_ACCEPT, params=params or None
         )
         return ListPolicyOutput.model_validate(body)
+
+    # ------------------------------------------------------------------
+    # GET /api/policies (pagination helper)
+    # ------------------------------------------------------------------
+
+    def iter_all(self, *, page_size: Optional[int] = None) -> Iterator[PolicyOutput]:
+        """Yield every access policy in the tenant, transparently paging through results.
+
+        Equivalent to repeatedly calling :meth:`list` and following
+        ``next_cursor`` until the server stops returning one.
+        """
+        cursor: Optional[str] = None
+        while True:
+            page = self.list(page_size=page_size, cursor=cursor)
+            yield from page.policies
+            cursor = page.next_cursor
+            if not cursor or not page.policies:
+                return
 
     # ------------------------------------------------------------------
     # POST /api/policies
