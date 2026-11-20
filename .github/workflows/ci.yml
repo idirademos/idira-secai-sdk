@@ -32,9 +32,7 @@ jobs:
         run: uv run ruff check secai tests
 
       - name: Test (offline suite)
-        run: >
-          uv run pytest tests/test_auth.py tests/test_client_resilience.py
-          tests/test_pagination.py -v
+        run: uv run pytest tests -v
 
   mypy:
     name: Type-check (mypy)

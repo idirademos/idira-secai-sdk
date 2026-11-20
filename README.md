@@ -1272,72 +1272,97 @@ echo "Created agent: $AGENT_ID"
 
 ## Running the Tests
 
-Most of the test suite (`test_agents_cli.py`, `test_targets_cli.py`, `test_policies_cli.py`,
-`test_reports_cli.py`) makes real API calls against a live tenant. `test_auth.py`,
-`test_client_resilience.py`, and `test_pagination.py` are the exceptions — they cover the local
-credential cache, `secai-cli login`/`logout`/`whoami`, the HTTP client's retry/backoff/
-auto-refresh behavior, and the `iter_all*` pagination helpers using `pytest-httpx` mocks, so they
-run fully offline with no tenant credentials required.
+The test suite is split into two parts, and the offline part is further split by what it exercises:
+
+- **Offline tests** run by default, with no real tenant, network access, or installed console
+  script required:
+  - **SDK-level** (`tests/test_agents.py`, `test_targets.py`, `test_policies.py`,
+    `test_reports.py`, `test_client_resilience.py`, `test_pagination.py`) construct a
+    `SecAIClient` directly and call resource methods (e.g. `client.agents.register(...)`),
+    asserting on the returned Pydantic model objects — these test the SDK as a plain Python
+    library, independent of the CLI.
+  - **CLI-level** (`tests/test_agents_cli.py`, `test_targets_cli.py`, `test_policies_cli.py`,
+    `test_reports_cli.py`, `test_auth.py`) invoke `secai-cli` in-process via
+    `typer.testing.CliRunner`, asserting on stdout/exit codes.
+  - Both layers mock every HTTP call with `pytest-httpx`'s `httpx_mock` fixture.
+- **Live tests** (`tests/live/`) invoke the installed `secai-cli` binary as a subprocess against a
+  genuine tenant, creating and tearing down real agents/MCP servers/policies. They are opt-in,
+  marked `@pytest.mark.live`, and excluded from the default run (`[tool.pytest.ini_options]
+  addopts = "-m 'not live'"` in `pyproject.toml`). Use them as a manual smoke test before releasing.
 
 **CI** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs on every push to `main` and
 every pull request, across Python 3.10–3.13:
 
-- `ruff check` (scoped to the `F`/`I`/`E501` rules, with a few pre-existing CLI files excluded —
-  see the workflow's comments) and the offline pytest suite above are **blocking**.
-- `mypy` runs across the whole `secai` package but is currently **informational only**
-  (`continue-on-error`) — the project's `strict = true` mypy config surfaces some pre-existing
-  type errors unrelated to any single change, so it reports without blocking merges until that
-  debt is cleaned up.
-- The full live-tenant suite isn't run in CI since it needs real credentials; run it locally as
+- `ruff check` and the full offline pytest suite (`pytest tests -v`, 178 tests) are **blocking**.
+- `mypy` (strict) runs across the `secai` package and is **blocking**.
+- The live-tenant suite isn't run in CI since it needs real credentials; run it locally as
   described below before releasing.
 
-Configure credentials first (only needed for the live tests):
+Install test dependencies:
+
+```bash
+pip install "secai[test]"
+```
+
+
+Run the offline suite (default — no credentials needed):
+
+```bash
+pytest tests/ -v --tb=short
+
+# A single resource's SDK-level tests (direct SecAIClient calls)
+pytest tests/test_agents.py -v
+pytest tests/test_targets.py -v
+pytest tests/test_policies.py -v
+pytest tests/test_reports.py -v
+
+# A single resource's CLI-level tests
+pytest tests/test_agents_cli.py -v
+pytest tests/test_targets_cli.py -v
+pytest tests/test_policies_cli.py -v
+pytest tests/test_reports_cli.py -v
+
+# Auth/login, HTTP client retry/backoff/auto-refresh, pagination helpers
+pytest tests/test_auth.py -v
+pytest tests/test_client_resilience.py -v
+pytest tests/test_pagination.py -v
+```
+
+Run the live-tenant smoke suite (requires real credentials):
 
 ```bash
 cp .env.example .env.test   # or set env vars directly
 # Edit .env.test with your SECAI_TENANT_URL and SECAI_TOKEN
-```
 
-Install test dependencies and run:
+pytest -m live tests/live/ -v --tb=short
 
-```bash
-pip install "secai[test]"
-
-# Run everything
-pytest tests/ -v --tb=short
-
-# Agents only
-pytest tests/test_agents_cli.py -v
-
-# Targets only
-pytest tests/test_targets_cli.py -v
-
-# Policies only
-pytest tests/test_policies_cli.py -v
-
-# Reports only
-pytest tests/test_reports_cli.py -v
-
-# Auth/login — offline, no tenant credentials needed
-pytest tests/test_auth.py -v
-
-# HTTP client retry/backoff/auto-refresh — offline, no tenant credentials needed
-pytest tests/test_client_resilience.py -v
-
-# Pagination helpers (iter_all) — offline, no tenant credentials needed
-pytest tests/test_pagination.py -v
+# Or target one resource
+pytest -m live tests/live/test_agents_cli.py -v
 
 # Run with explicit credentials (overrides .env.test)
 SECAI_TENANT_URL=https://my.cyberark.cloud \
 SECAI_TOKEN=$(cat my_jwt.txt) \
-pytest tests/ -v
+pytest -m live tests/live/ -v
 ```
 
 **What the tests do:**
 
-- Session-scoped fixtures in `conftest.py` register one test agent and one test MCP server at
-  the start of the session, then delete them at the end.
-- Every test resource name is prefixed with `test-secai-sdk-` for easy identification.
+- The offline SDK-level tests (`test_agents.py`, `test_targets.py`, `test_policies.py`,
+  `test_reports.py`) construct a `SecAIClient` directly (base URL `https://tenant.example.com`,
+  matching `test_pagination.py`/`test_client_resilience.py`'s convention) and call resource
+  methods — `client.agents.register(...)`, `client.targets.set_mcp_server_state(...)`, etc. —
+  asserting on the returned Pydantic model objects and on exception classes raised for error
+  responses (e.g. `ConflictError`, `NotFoundError`). These exercise the SDK as a plain Python
+  library, independent of the CLI; `list()`/`iter_all()`-style pagination is covered separately
+  in `test_pagination.py` and not duplicated here.
+- The offline CLI tests (`test_agents_cli.py`, `test_targets_cli.py`, `test_policies_cli.py`,
+  `test_reports_cli.py`) build realistic JSON fixture payloads per test and register them with
+  `httpx_mock` before invoking the CLI in-process against `https://mock.secai.test`/a dummy
+  token, exercising the same list/register/get/edit/delete/set-state/error-handling command
+  surface as the live suite with no network access.
+- `tests/live/conftest.py`'s session-scoped fixtures register one test agent, one test MCP
+  server, and one test policy at the start of the live-suite run, then delete them at the end.
+  Every live test resource name is prefixed with `test-secai-sdk-` for easy identification.
 - Each test class is self-contained; failing one class does not block others.
 - Negative-path tests verify that the correct HTTP error code appears on stderr.
 - `test_auth.py` isolates the credential cache per-test via a `tmp_path`-based fixture and
@@ -1426,7 +1451,7 @@ Done.
 
 ```plaintext
 idira-secai-sdk/
-├── .github/workflows/ci.yml    # CI: ruff + offline pytest (blocking), mypy (informational)
+├── .github/workflows/ci.yml    # CI: ruff + offline pytest + mypy (all blocking)
 ├── CHANGELOG.md                # Version history, including breaking changes
 ├── pyproject.toml              # Package metadata and dependencies
 ├── scratch/                    # API spec + diff/usage notes (not part of the package)
@@ -1454,14 +1479,25 @@ idira-secai-sdk/
 │
 ├── tests/
 │   ├── __init__.py
-│   ├── conftest.py             # Session fixtures (live agent + MCP server)
-│   ├── test_agents_cli.py      # Agent test cases (positive + negative)
-│   ├── test_targets_cli.py     # Target test cases (positive + negative)
-│   ├── test_policies_cli.py    # Policy test cases (positive + negative)
-│   ├── test_reports_cli.py     # Report test cases (positive + negative)
+│   ├── conftest.py             # Offline CLI helper (CliRunner-based run_cli + CliResult)
+│   ├── test_agents.py          # AgentsResource SDK-level tests (offline, httpx_mock)
+│   ├── test_targets.py         # TargetsResource SDK-level tests (offline, httpx_mock)
+│   ├── test_policies.py        # PoliciesResource SDK-level tests (offline, httpx_mock)
+│   ├── test_reports.py         # ReportsResource SDK-level tests (offline, httpx_mock)
+│   ├── test_agents_cli.py      # Agent CLI tests (offline, httpx_mock)
+│   ├── test_targets_cli.py     # Target CLI tests (offline, httpx_mock)
+│   ├── test_policies_cli.py    # Policy CLI tests (offline, httpx_mock)
+│   ├── test_reports_cli.py     # Report CLI tests (offline, httpx_mock)
 │   ├── test_auth.py            # login/logout/whoami + credential cache (offline, mocked)
 │   ├── test_client_resilience.py  # Retry/backoff + 401 auto-refresh (offline, mocked)
-│   └── test_pagination.py      # iter_all()/iter_all_mcp_servers() helpers (offline, mocked)
+│   ├── test_pagination.py      # iter_all()/iter_all_mcp_servers() helpers (offline, mocked)
+│   └── live/                   # Opt-in real-tenant smoke suite (pytest -m live)
+│       ├── __init__.py
+│       ├── conftest.py         # Session fixtures (live agent/MCP server/policy) + subprocess run_cli
+│       ├── test_agents_cli.py
+│       ├── test_targets_cli.py
+│       ├── test_policies_cli.py
+│       └── test_reports_cli.py
 │
 └── sdk-quickstart/
     └── quickstart.py           # Annotated end-to-end walkthrough

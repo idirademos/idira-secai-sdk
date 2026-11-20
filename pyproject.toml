@@ -55,6 +55,10 @@ secai = ["py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-m 'not live'"
+markers = [
+    "live: requires a real SecAI tenant (SECAI_TENANT_URL/SECAI_TOKEN); run with `pytest -m live`",
+]
 
 [tool.ruff]
 line-length = 100
