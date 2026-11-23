@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import os
 import sys
-from typing import Optional
 
 import typer
 from rich.console import Console
@@ -14,6 +13,8 @@ from rich.table import Table
 from ..client import SecAIClient
 from ..exceptions import SecAIError
 from ..models import (
+    ApiKeyEntry,
+    AuthMethodUpdate,
     EditMcpServerRequest,
     McpAuthMethod,
     McpAuthType,
@@ -24,8 +25,11 @@ from ..models import (
     McpUpstream,
     Owner,
     OwnerType,
-    RegisterMcpServerRequest,
+    RegisterCustomMcpServerRequest,
+    RegisterPredefinedMcpServerRequest,
+    UpstreamHeader,
 )
+from .auth import build_token_refresher, resolve_credentials
 
 targets_app = typer.Typer(no_args_is_help=True)
 console = Console()
@@ -33,10 +37,13 @@ err_console = Console(stderr=True)
 
 
 def _client() -> SecAIClient:
+    tenant_url, token = resolve_credentials()
     return SecAIClient(
-        tenant_url=os.environ.get("SECAI_TENANT_URL"),
-        token=os.environ.get("SECAI_TOKEN"),
+        tenant_url=tenant_url,
+        token=token,
         timeout=float(os.environ.get("SECAI_TIMEOUT", "30")),
+        max_retries=int(os.environ.get("SECAI_MAX_RETRIES", "3")),
+        token_refresher=build_token_refresher(tenant_url) if tenant_url else None,
     )
 
 
@@ -57,6 +64,17 @@ def _parse_tags(raw: list[str]) -> dict[str, str]:
 
 def _parse_owners(owner_ids: list[str]) -> list[Owner]:
     return [Owner(id=oid, name=oid, type=OwnerType.USER) for oid in owner_ids]
+
+
+def _parse_headers(raw: list[str]) -> list[UpstreamHeader]:
+    """Parse ``NAME=VALUE_TEMPLATE`` pairs, e.g. ``Authorization=Bearer {{apiKey}}``."""
+    headers = []
+    for item in raw:
+        if "=" not in item:
+            raise typer.BadParameter(f"Expected NAME=VALUE_TEMPLATE, got: {item}")
+        name, _, value_template = item.partition("=")
+        headers.append(UpstreamHeader(name=name.strip(), valueTemplate=value_template.strip()))
+    return headers
 
 
 def _die(exc: SecAIError) -> None:
@@ -92,14 +110,17 @@ def _help_if_missing(ctx: typer.Context, **named_values: object) -> None:
 
 @targets_app.command("list")
 def targets_list(
-    cursor: Optional[str] = typer.Option(None, "--cursor", help="Pagination cursor from a previous response."),
-    output: Optional[str] = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
+    page_size: int | None = typer.Option(None, "--page-size", help="Max items per page."),
+    next_cursor: str | None = typer.Option(
+        None, "--next-cursor", help="Pagination cursor from a previous response."
+    ),
+    output: str | None = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
 ) -> None:
     """List all registered MCP servers."""
     fmt = (output or _fmt()).lower()
     try:
         with _client() as client:
-            resp = client.targets.list_mcp_servers(cursor=cursor)
+            resp = client.targets.list_mcp_servers(page_size=page_size, next_cursor=next_cursor)
     except SecAIError as exc:
         _die(exc)
         return
@@ -113,11 +134,16 @@ def targets_list(
 
     if fmt == "json":
         from rich import print_json
-        print_json(json.dumps(
-            {"mcpServers": [s.model_dump(by_alias=True) for s in servers],
-             "nextCursor": resp.next_cursor},
-            default=str,
-        ))
+
+        print_json(
+            json.dumps(
+                {
+                    "mcpServers": [s.model_dump(by_alias=True) for s in servers],
+                    "nextCursor": resp.next_cursor,
+                },
+                default=str,
+            )
+        )
         return
 
     _state_colors = {"ENABLED": "green", "DISABLED": "yellow"}
@@ -151,54 +177,109 @@ def targets_list(
 @targets_app.command("register")
 def targets_register(
     ctx: typer.Context,
-    source: Optional[McpSourceType] = typer.Option(None, "--source", help="CUSTOM or PREDEFINED. [required]"),
-    name: Optional[str] = typer.Option(None, "--name", "-n", help="MCP server name. [required for CUSTOM]"),
-    description: Optional[str] = typer.Option(None, "--description", "-d"),
-    category: Optional[McpCategory] = typer.Option(None, "--category", "-c", help="Server category. [required for CUSTOM]"),
-    url: Optional[str] = typer.Option(None, "--url", help="Upstream MCP server URL. [required for CUSTOM]"),
-    auth_type: Optional[McpAuthType] = typer.Option(None, "--auth-type", help="OAUTH2.1 or NONE."),
-    auth_server: Optional[str] = typer.Option(None, "--auth-server", help="Authorization server URL."),
-    jwks: Optional[str] = typer.Option(None, "--jwks", help="JWKS URL for token validation."),
-    predefined_id: Optional[str] = typer.Option(None, "--predefined-id", help="Predefined template UUID. [required for PREDEFINED]"),
-    predefined_version: Optional[int] = typer.Option(None, "--predefined-version", help="Template version (defaults to latest)."),
-    tag: Optional[list[str]] = typer.Option(None, "--tag", help="TAG=VALUE (repeatable)."),
-    owner_id: Optional[list[str]] = typer.Option(None, "--owner-id", help="Owner user ID (repeatable)."),
-    output: Optional[str] = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
+    source: McpSourceType | None = typer.Option(
+        None, "--source", help="CUSTOM or PREDEFINED. [required]"
+    ),
+    name: str | None = typer.Option(
+        None, "--name", "-n", help="MCP server name. [required for CUSTOM]"
+    ),
+    description: str | None = typer.Option(
+        None, "--description", "-d", help="[required for CUSTOM]"
+    ),
+    category: McpCategory | None = typer.Option(
+        None, "--category", "-c", help="Server category. [required for CUSTOM]"
+    ),
+    url: str | None = typer.Option(
+        None, "--url", help="Upstream MCP server URL. [required for CUSTOM]"
+    ),
+    auth_type: McpAuthType | None = typer.Option(
+        None, "--auth-type", help="OAUTH2.1, NONE, API_KEY, or PAT."
+    ),
+    auth_server: str | None = typer.Option(
+        None, "--auth-server", help="Authorization server URL (OAUTH2.1)."
+    ),
+    jwks: str | None = typer.Option(
+        None, "--jwks", help="JWKS URL for token validation (OAUTH2.1)."
+    ),
+    client_id: str | None = typer.Option(None, "--client-id", help="OAuth client ID (OAUTH2.1)."),
+    client_secret: str | None = typer.Option(
+        None, "--client-secret", help="OAuth client secret (OAUTH2.1)."
+    ),
+    auth_header: list[str] | None = typer.Option(
+        None,
+        "--auth-header",
+        help="Upstream header as NAME=VALUE_TEMPLATE (repeatable; API_KEY/PAT).",
+    ),
+    api_key: list[str] | None = typer.Option(
+        None, "--api-key", help="API key value to store (repeatable, write-only; API_KEY)."
+    ),
+    predefined_id: str | None = typer.Option(
+        None, "--predefined-id", help="Predefined template UUID. [required for PREDEFINED]"
+    ),
+    predefined_version: int | None = typer.Option(
+        None, "--predefined-version", help="Template version (defaults to latest)."
+    ),
+    tag: list[str] | None = typer.Option(None, "--tag", help="TAG=VALUE (repeatable)."),
+    owner_id: list[str] | None = typer.Option(
+        None, "--owner-id", help="Owner user ID (repeatable)."
+    ),
+    output: str | None = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
 ) -> None:
     """Register a custom or predefined MCP server target."""
     _help_if_missing(ctx, source=source)
+    assert source is not None
     fmt = (output or _fmt()).lower()
 
-    src = McpSource(
-        type=source,
-        predefinedTargetId=predefined_id,
-        predefinedTargetVersion=predefined_version,
-    )
-    upstream = McpUpstream(url=url) if url else None
-    auth = McpAuthMethod(
-        type=auth_type or McpAuthType.NONE,
-        authorizationServer=auth_server,
-        JWKS=jwks,
-    ) if auth_type else None
+    auth: McpAuthMethod | None = None
+    if auth_type:
+        auth = McpAuthMethod(
+            type=auth_type,
+            authorizationServer=auth_server,
+            JWKS=jwks,
+            clientId=client_id,
+            clientSecret=client_secret,
+            headers=_parse_headers(auth_header) if auth_header else [],
+            apiKeys=[ApiKeyEntry(apiKey=k) for k in api_key] if api_key else [],
+        )
 
-    # Only pass fields with real values so model_dump(exclude_unset=True)
-    # omits empty collections from the request payload.
-    req_kwargs: dict[str, object] = {"source": src}
-    if name is not None:
-        req_kwargs["name"] = name
-    if description is not None:
-        req_kwargs["description"] = description
-    if category is not None:
-        req_kwargs["category"] = category
-    if upstream is not None:
-        req_kwargs["upstream"] = upstream
-    if auth is not None:
-        req_kwargs["authMethod"] = auth
-    if tag:
-        req_kwargs["tags"] = _parse_tags(tag)
-    if owner_id:
-        req_kwargs["owners"] = _parse_owners(owner_id)
-    req = RegisterMcpServerRequest(**req_kwargs)
+    req: RegisterCustomMcpServerRequest | RegisterPredefinedMcpServerRequest
+    try:
+        if source == McpSourceType.CUSTOM:
+            if not (name and description and category and url):
+                _help_if_missing(
+                    ctx, name=name, description=description, category=category, url=url
+                )
+            assert name is not None
+            assert description is not None
+            assert category is not None
+            assert url is not None
+            req = RegisterCustomMcpServerRequest(
+                name=name,
+                description=description,
+                category=category,
+                upstream=McpUpstream(url=url),
+                authMethod=auth,
+                tags=_parse_tags(tag) if tag else {},
+                owners=_parse_owners(owner_id) if owner_id else [],
+            )
+        else:
+            if not predefined_id:
+                _help_if_missing(ctx, predefined_id=predefined_id)
+                assert predefined_id is not None
+            req = RegisterPredefinedMcpServerRequest(
+                source=McpSource(
+                    type=McpSourceType.PREDEFINED,
+                    predefinedTargetId=predefined_id,
+                    predefinedTargetVersion=predefined_version,
+                ),
+                description=description,
+                authMethod=auth,
+                tags=_parse_tags(tag) if tag else {},
+                owners=_parse_owners(owner_id) if owner_id else [],
+            )
+    except ValueError as exc:
+        err_console.print(f"[bold red]Invalid request:[/bold red] {exc}")
+        raise typer.Exit(1) from exc
 
     try:
         with _client() as client:
@@ -213,6 +294,7 @@ def targets_register(
 
     if fmt == "json":
         from rich import print_json
+
         print_json(json.dumps(server.model_dump(by_alias=True), default=str))
         return
 
@@ -231,11 +313,12 @@ def targets_register(
 @targets_app.command("get")
 def targets_get(
     ctx: typer.Context,
-    server_id: Optional[str] = typer.Argument(None, help="MCP server ID. [required]"),
-    output: Optional[str] = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
+    server_id: str | None = typer.Argument(None, help="MCP server ID. [required]"),
+    output: str | None = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
 ) -> None:
     """Get details of a registered MCP server."""
     _help_if_missing(ctx, server_id=server_id)
+    assert server_id is not None
     fmt = (output or _fmt()).lower()
     try:
         with _client() as client:
@@ -250,6 +333,7 @@ def targets_get(
 
     if fmt == "json":
         from rich import print_json
+
         print_json(json.dumps(server.model_dump(by_alias=True), default=str))
         return
 
@@ -260,6 +344,7 @@ def targets_get(
     console.print(f"  Category   : {server.category.value if server.category else '—'}")
     console.print(f"  Upstream   : {server.upstream.url if server.upstream else '—'}")
     console.print(f"  Gateway    : {server.gateway_url or '—'}")
+    console.print(f"  Callback   : {server.callback_url or '—'}")
     console.print(f"  Auth       : {server.auth_method.type.value if server.auth_method else '—'}")
     console.print(f"  State      : {server.state.value if server.state else '—'}")
     if server.tags:
@@ -274,21 +359,49 @@ def targets_get(
 @targets_app.command("edit")
 def targets_edit(
     ctx: typer.Context,
-    server_id: Optional[str] = typer.Argument(None, help="MCP server ID. [required]"),
-    description: Optional[str] = typer.Option(None, "--description", "-d"),
-    category: Optional[McpCategory] = typer.Option(None, "--category", "-c", help="Custom targets only."),
-    tag: Optional[list[str]] = typer.Option(None, "--tag", help="TAG=VALUE (repeatable). Replaces all tags."),
-    owner_id: Optional[list[str]] = typer.Option(None, "--owner-id", help="Owner user ID (repeatable)."),
-    output: Optional[str] = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
+    server_id: str | None = typer.Argument(None, help="MCP server ID. [required]"),
+    description: str | None = typer.Option(None, "--description", "-d"),
+    category: McpCategory | None = typer.Option(
+        None, "--category", "-c", help="Custom targets only."
+    ),
+    tag: list[str] | None = typer.Option(
+        None, "--tag", help="TAG=VALUE (repeatable). Replaces all tags."
+    ),
+    owner_id: list[str] | None = typer.Option(
+        None, "--owner-id", help="Owner user ID (repeatable)."
+    ),
+    auth_header: list[str] | None = typer.Option(
+        None,
+        "--auth-header",
+        help=(
+            "Rotate upstream header as NAME=VALUE_TEMPLATE "
+            "(repeatable; API_KEY/PAT targets only)."
+        ),
+    ),
+    api_key: list[str] | None = typer.Option(
+        None,
+        "--api-key",
+        help="Rotate API key value (repeatable, write-only; API_KEY targets only).",
+    ),
+    output: str | None = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
 ) -> None:
-    """Edit MCP server metadata (description, owners, tags, category for custom)."""
+    """Edit MCP server metadata (description, owners, tags, category for custom,
+    auth credentials for API_KEY/PAT)."""
     _help_if_missing(ctx, server_id=server_id)
+    assert server_id is not None
     fmt = (output or _fmt()).lower()
+    auth_update = None
+    if auth_header or api_key:
+        auth_update = AuthMethodUpdate(
+            headers=_parse_headers(auth_header) if auth_header else None,
+            apiKeys=[ApiKeyEntry(apiKey=k) for k in api_key] if api_key else None,
+        )
     req = EditMcpServerRequest(
         description=description,
         category=category,
         tags=_parse_tags(tag) if tag else None,
         owners=_parse_owners(owner_id) if owner_id else None,
+        authMethod=auth_update,
     )
     try:
         with _client() as client:
@@ -303,6 +416,7 @@ def targets_edit(
 
     if fmt == "json":
         from rich import print_json
+
         print_json(json.dumps(server.model_dump(by_alias=True), default=str))
         return
 
@@ -320,11 +434,12 @@ def targets_edit(
 @targets_app.command("delete")
 def targets_delete(
     ctx: typer.Context,
-    server_id: Optional[str] = typer.Argument(None, help="MCP server ID. [required]"),
+    server_id: str | None = typer.Argument(None, help="MCP server ID. [required]"),
     confirm: bool = typer.Option(False, "--confirm", help="Required to proceed with deletion."),
 ) -> None:
-    """Delete a custom MCP server (predefined targets cannot be deleted)."""
+    """Delete a custom MCP server (must be DISABLED first; predefined targets cannot be deleted)."""
     _help_if_missing(ctx, server_id=server_id)
+    assert server_id is not None
     if not confirm:
         err_console.print("[yellow]Pass --confirm to proceed with deletion.[/yellow]")
         raise typer.Exit(1)
@@ -345,12 +460,16 @@ def targets_delete(
 @targets_app.command("set-state")
 def targets_set_state(
     ctx: typer.Context,
-    server_id: Optional[str] = typer.Argument(None, help="MCP server ID. [required]"),
-    state: Optional[McpState] = typer.Argument(None, help="Target state: ENABLED or DISABLED. [required]"),
-    output: Optional[str] = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
+    server_id: str | None = typer.Argument(None, help="MCP server ID. [required]"),
+    state: McpState | None = typer.Argument(
+        None, help="Target state: ENABLED or DISABLED. [required]"
+    ),
+    output: str | None = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
 ) -> None:
     """Set the state of a registered MCP server to ENABLED or DISABLED."""
     _help_if_missing(ctx, server_id=server_id, state=state)
+    assert server_id is not None
+    assert state is not None
     fmt = (output or _fmt()).lower()
     try:
         with _client() as client:
@@ -365,6 +484,7 @@ def targets_set_state(
 
     if fmt == "json":
         from rich import print_json
+
         print_json(json.dumps(server.model_dump(by_alias=True), default=str))
         return
 
@@ -379,7 +499,7 @@ def targets_set_state(
 
 @targets_app.command("list-predefined")
 def targets_list_predefined(
-    output: Optional[str] = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
+    output: str | None = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
 ) -> None:
     """List all predefined MCP server templates from the catalog."""
     fmt = (output or _fmt()).lower()
@@ -399,10 +519,13 @@ def targets_list_predefined(
 
     if fmt == "json":
         from rich import print_json
-        print_json(json.dumps(
-            {"targets": [t.model_dump(by_alias=True) for t in targets]},
-            default=str,
-        ))
+
+        print_json(
+            json.dumps(
+                {"targets": [t.model_dump(by_alias=True) for t in targets]},
+                default=str,
+            )
+        )
         return
 
     table = Table(title=f"Predefined MCP Servers ({len(targets)})", header_style="bold blue")
@@ -415,7 +538,9 @@ def targets_list_predefined(
     for t in targets:
         cat = t.category.value if t.category else "—"
         auth = t.auth_method.type.value if t.auth_method else "—"
-        table.add_row(t.id or "—", t.name or "—", cat, auth, str(t.predefined_target_version or "—"))
+        table.add_row(
+            t.id or "—", t.name or "—", cat, auth, str(t.predefined_target_version or "—")
+        )
 
     console.print(table)
 
@@ -428,11 +553,12 @@ def targets_list_predefined(
 @targets_app.command("get-predefined")
 def targets_get_predefined(
     ctx: typer.Context,
-    predefined_id: Optional[str] = typer.Argument(None, help="Predefined MCP server UUID. [required]"),
-    output: Optional[str] = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
+    predefined_id: str | None = typer.Argument(None, help="Predefined MCP server UUID. [required]"),
+    output: str | None = typer.Option(None, "--output", "-o", envvar="SECAI_OUTPUT"),
 ) -> None:
-    """Get details of a specific predefined MCP server template."""
+    """Get details of a specific predefined MCP server template, including its tools."""
     _help_if_missing(ctx, predefined_id=predefined_id)
+    assert predefined_id is not None
     fmt = (output or _fmt()).lower()
     try:
         with _client() as client:
@@ -447,6 +573,7 @@ def targets_get_predefined(
 
     if fmt == "json":
         from rich import print_json
+
         print_json(json.dumps(tmpl.model_dump(by_alias=True), default=str))
         return
 
@@ -457,5 +584,10 @@ def targets_get_predefined(
     console.print(f"  Upstream   : {tmpl.upstream.url if tmpl.upstream else '—'}")
     console.print(f"  Auth       : {tmpl.auth_method.type.value if tmpl.auth_method else '—'}")
     console.print(f"  Version    : {tmpl.predefined_target_version or '—'}")
+    console.print(f"  Callback   : {tmpl.callback_url or '—'}")
     if tmpl.tags:
         console.print(f"  Tags       : {tmpl.tags}")
+    if tmpl.tools:
+        console.print("  Tools:")
+        for tool in tmpl.tools:
+            console.print(f"    - {tool.name}: {tool.description}")

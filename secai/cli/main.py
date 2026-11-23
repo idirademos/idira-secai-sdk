@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import shlex
@@ -13,8 +14,8 @@ import typer
 from dotenv import load_dotenv
 from rich import print_json
 from rich.console import Console
-from rich.table import Table
 
+from .. import __version__
 from ..exceptions import SecAIError
 
 load_dotenv()
@@ -28,6 +29,25 @@ app = typer.Typer(
 
 console = Console()
 err_console = Console(stderr=True)
+
+
+def _version_callback(value: bool) -> None:
+    if value:
+        typer.echo(f"secai-cli {__version__}")
+        raise typer.Exit()
+
+
+@app.callback()
+def _main(
+    version: bool = typer.Option(
+        False,
+        "--version",
+        callback=_version_callback,
+        is_eager=True,
+        help="Show the secai-cli version and exit.",
+    ),
+) -> None:
+    """CyberArk Secure AI API — agent and MCP server management."""
 
 
 # ---------------------------------------------------------------------------
@@ -72,10 +92,18 @@ def handle_error(exc: SecAIError) -> None:
 # ---------------------------------------------------------------------------
 
 from .agents_cmds import agents_app  # noqa: E402
+from .auth_cmds import login, logout, whoami  # noqa: E402
+from .policies_cmds import policies_app  # noqa: E402
+from .reports_cmds import reports_app  # noqa: E402
 from .targets_cmds import targets_app  # noqa: E402
 
+app.command("login")(login)
+app.command("logout")(logout)
+app.command("whoami")(whoami)
 app.add_typer(agents_app, name="agents", help="Agent inventory and lifecycle management.")
 app.add_typer(targets_app, name="targets", help="MCP server target registry management.")
+app.add_typer(policies_app, name="policies", help="Access policy management.")
+app.add_typer(reports_app, name="reports", help="Insights and activity map reporting.")
 
 
 def _preprocess_argv() -> None:
@@ -93,10 +121,9 @@ def _preprocess_argv() -> None:
     """
     args = sys.argv[1:]
     if any('"' in arg or "'" in arg for arg in args):
-        try:
+        # malformed quoting — leave argv alone and let Click report it
+        with contextlib.suppress(ValueError):
             sys.argv[1:] = shlex.split(" ".join(args))
-        except ValueError:
-            pass  # malformed quoting — leave argv alone and let Click report it
 
 
 def main() -> None:

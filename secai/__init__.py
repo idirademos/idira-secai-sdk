@@ -1,10 +1,14 @@
 """SecAI — CyberArk Secure AI Python SDK."""
 
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _pkg_version
+
 from .client import SecAIClient
 from .exceptions import (
     AuthenticationError,
     AuthorizationError,
     ConflictError,
+    NotAcceptableError,
     NotFoundError,
     RateLimitError,
     SecAIError,
@@ -13,8 +17,11 @@ from .exceptions import (
     ValidationError,
 )
 from .models import (
+    ActivityMapDateRange,
+    ActivityMapReport,
     Agent,
     AgentCredentials,
+    AgentsSummary,
     AgentState,
     AgentStateRequest,
     AgentStateResponse,
@@ -22,9 +29,20 @@ from .models import (
     AgentType,
     AgentWithCredentials,
     ApiError,
+    ApiKeyEntry,
+    ApiKeyMetadata,
+    AuthMethodUpdate,
+    AuthnDescriptorEntry,
+    AuthnDescriptorInput,
+    AuthnDescriptorOutput,
+    AuthnDescriptorType,
+    Condition,
+    ConditionGroup,
+    ConditionOp,
     EditAgentRequest,
     EditMcpServerRequest,
     ListAgentsResponse,
+    ListPolicyOutput,
     McpAuthMethod,
     McpAuthType,
     McpCategory,
@@ -35,12 +53,29 @@ from .models import (
     McpSourceType,
     McpState,
     McpUpstream,
+    OauthApplicationRegistration,
     Owner,
     OwnerType,
+    PageInfo,
+    PolicyAccessType,
+    PolicyInput,
+    PolicyOutput,
+    PolicyState,
+    PolicyStateRequest,
+    PolicyStateResponse,
+    PolicyUpdate,
     PredefinedMcpListResponse,
     PredefinedMcpTarget,
+    PredefinedMcpTargetDetail,
+    PredefinedMcpTool,
     RegisterAgentRequest,
+    RegisterCustomMcpServerRequest,
     RegisterMcpServerRequest,
+    RegisterPredefinedMcpServerRequest,
+    SearchAgentsRequest,
+    SummaryData,
+    SummaryItem,
+    UpstreamHeader,
 )
 
 __all__ = [
@@ -54,6 +89,7 @@ __all__ = [
     "ConflictError",
     "ValidationError",
     "RateLimitError",
+    "NotAcceptableError",
     "ServerError",
     "UnexpectedError",
     # Models — agents
@@ -69,7 +105,16 @@ __all__ = [
     "AgentWithCredentials",
     "AgentStateRequest",
     "AgentStateResponse",
+    "PageInfo",
     "ListAgentsResponse",
+    "SearchAgentsRequest",
+    "SummaryItem",
+    "SummaryData",
+    "AgentsSummary",
+    "AuthnDescriptorType",
+    "AuthnDescriptorInput",
+    "AuthnDescriptorEntry",
+    "AuthnDescriptorOutput",
     # Models — targets
     "McpSourceType",
     "McpAuthType",
@@ -77,16 +122,47 @@ __all__ = [
     "McpState",
     "McpSource",
     "McpUpstream",
+    "UpstreamHeader",
+    "ApiKeyEntry",
+    "ApiKeyMetadata",
     "McpAuthMethod",
+    "AuthMethodUpdate",
     "McpServerResponse",
     "RegisterMcpServerRequest",
+    "RegisterCustomMcpServerRequest",
+    "RegisterPredefinedMcpServerRequest",
     "EditMcpServerRequest",
     "McpServerStateRequest",
     "McpServerListResponse",
+    "OauthApplicationRegistration",
+    "PredefinedMcpTool",
     "PredefinedMcpTarget",
+    "PredefinedMcpTargetDetail",
     "PredefinedMcpListResponse",
+    # Models — policies
+    "PolicyState",
+    "PolicyAccessType",
+    "ConditionOp",
+    "Condition",
+    "ConditionGroup",
+    "PolicyInput",
+    "PolicyUpdate",
+    "PolicyOutput",
+    "ListPolicyOutput",
+    "PolicyStateRequest",
+    "PolicyStateResponse",
+    # Models — reports
+    "ActivityMapDateRange",
+    "ActivityMapReport",
     # Misc
     "ApiError",
 ]
 
-__version__ = "0.1.0"
+try:
+    # Single source of truth is the `version` in pyproject.toml; this reads
+    # the installed package's metadata instead of duplicating the string
+    # here. Only fails if secai is imported from an uninstalled source
+    # checkout (e.g. no `pip install -e .` yet).
+    __version__ = _pkg_version("secai")
+except PackageNotFoundError:  # pragma: no cover
+    __version__ = "0.0.0+unknown"
