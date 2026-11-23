@@ -17,6 +17,12 @@ may include breaking changes.
 5. Commit `pyproject.toml`, `uv.lock`, and `CHANGELOG.md` together, then tag the release
    (e.g. `git tag v0.3.0 && git push --tags`).
 
+## 0.2.2
+
+- **`agents get` shows authentication descriptors**: the default (table) output now includes an
+  "Authn descriptors" table (ID, type, sub-type, service ID, client ID, data). Descriptor
+  `clientSecret` values are intentionally omitted from the table; `-o json` output is unchanged.
+
 ## 0.2.1
 
 - **Lint/type debt cleanup**: resolved all 385 pre-existing `ruff` findings (full rule set
