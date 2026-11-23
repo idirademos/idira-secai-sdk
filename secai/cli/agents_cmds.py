@@ -417,6 +417,30 @@ def agents_get(
         console.print(f"  Tags       : {agent.tags}")
     console.print(f"  Created    : {agent.created_at} by {agent.created_by or '—'}")
     console.print(f"  Updated    : {agent.updated_at} by {agent.updated_by or '—'}")
+    if agent.authn_descriptors:
+        table = Table(
+            title=f"Authn descriptors ({len(agent.authn_descriptors)})",
+            show_header=True,
+            header_style="bold blue",
+        )
+        table.add_column("ID", style="dim", no_wrap=True)
+        table.add_column("Type")
+        table.add_column("Sub-type")
+        table.add_column("Service ID")
+        table.add_column("Client ID")
+        table.add_column("Data")
+        for d in agent.authn_descriptors:
+            table.add_row(
+                d.id or "—",
+                d.type or "—",
+                d.sub_type or "—",
+                d.service_id or "—",
+                d.client_id or "—",
+                json.dumps(d.data, default=str) if d.data else "—",
+            )
+        console.print(table)
+    else:
+        console.print("  Authn descriptors: —")
 
 
 # ---------------------------------------------------------------------------

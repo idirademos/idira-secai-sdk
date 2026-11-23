@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "secai"
-version = "0.2.1"
+version = "0.2.2"
 description = "Idira Secure AI Python SDK — to automate AI agent & MCP target inventory management"
 readme = "README.md"
 license = { text = "Apache-2.0" }

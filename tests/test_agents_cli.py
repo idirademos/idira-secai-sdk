@@ -212,6 +212,24 @@ class TestAgentsGet:
         assert "name" in data
         assert "status" in data
 
+    def test_get_table_shows_authn_descriptors(self, httpx_mock) -> None:
+        body = _agent()
+        body["authnDescriptors"] = [
+            {
+                "id": "desc-1",
+                "type": "SPIFFE",
+                "data": {"spiffeId": "spiffe://example.org/agent"},
+                "clientSecret": "do-not-print",
+            }
+        ]
+        httpx_mock.add_response(method="GET", url=f"{_BASE}/{_AGENT_ID}", json=body)
+        result = run_cli("agents", "get", _AGENT_ID, "--output", "table")
+        assert result.returncode == 0
+        assert "Authn descriptors (1)" in result.stdout
+        assert "desc-1" in result.stdout
+        assert "SPIFFE" in result.stdout
+        assert "do-not-print" not in result.stdout
+
     def test_get_quiet_outputs_id(self, httpx_mock) -> None:
         httpx_mock.add_response(method="GET", url=f"{_BASE}/{_AGENT_ID}", json=_agent())
         result = run_cli("agents", "get", _AGENT_ID, "--output", "quiet")
